@@ -1,6 +1,7 @@
 build/
 *.swo
 *.swp
+.cache
 
 
 
