@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.13)
 
 project(networked)
 
+set(CMAKE_BUILD_TYPE Debug)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -13,9 +15,4 @@ add_library(project_warnings INTERFACE)
 
 add_subdirectory(3rdParty)
 
-add_subdirectory(w2)
-add_subdirectory(w4)
-add_subdirectory(w5)
-add_subdirectory(w7)
-add_subdirectory(w10)
-
+add_subdirectory(w1)
