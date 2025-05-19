@@ -35,8 +35,6 @@ public:
         return connected;
     }
 
-    bool connect(const std::string& server_name, int port);
-
     void reset() {
         connected = false;
         serverSockAddr = {};
@@ -44,13 +42,8 @@ public:
         sfd = -1;
     }
 
-    ssize_t send(const std::string& msg) const {
-        std::cout << "(sending message: " << msg << ")" << std::endl;
-        ssize_t res = sendto(sfd, msg.c_str(), msg.size(), 0, (sockaddr*)&serverSockAddr, sizeof(serverSockAddr));
-        if (res == -1) std::cout << strerror(errno) << std::endl;
-        return res;
-    }
-
+    bool connect(const std::string& server_name, int port);
+    ssize_t send(const std::string& msg) const;
     std::string read() const;
 };
 
@@ -88,43 +81,41 @@ bool Client::connect(const std::string& server_name, int port) {
     return true;
 }
 
-void Client::start_listening() {
-    std::string pingMsgStr = "ping";
-    pingMsgStr += id;
-
-    send(pingMsgStr);
-
-    while (true) {
-        fd_set readFds;
-        FD_ZERO(&readFds);
-        FD_SET(sfd, &readFds);
-
-        timeval tv = {1, 0}; // 1 second timeout
-        int ready = select(sfd + 1, &readFds, nullptr, nullptr, &tv);
-
-        if (ready < 0) {
-            perror("select error");
-            break;
-        } else if (ready == 0) {
-            std::cout << "no response from server?" << std::endl;
-            send(pingMsgStr);
-        } else {
-            char buffer[1024];
-            sockaddr_in responderAddr;
-            socklen_t addrLen = sizeof(responderAddr);
-            ssize_t numBytes = recvfrom(sfd, buffer, sizeof(buffer), 0, (sockaddr*)&responderAddr, &addrLen);
-
-            if (numBytes > 0) {
-                buffer[numBytes] = '\0';
-                printf("Received '%s' from server. Sending 'ping' again...\n", buffer);
-                std::cout << pingMsgStr << std::endl;
-                sleep(1);
-                send(pingMsgStr);
-            }
-        }
-    }
+ssize_t Client::send(const std::string& msg) const {
+    std::cout << "(sending message: " << msg << ")" << std::endl;
+    ssize_t res = sendto(sfd, msg.c_str(), msg.size(), 0, (sockaddr*)&serverSockAddr, sizeof(serverSockAddr));
+    if (res == -1) std::cout << "(error while sending message: " << strerror(errno) << ")" << std::endl;
+    return res;
 }
 
+std::string Client::read() const {
+    fd_set readFds;
+    FD_ZERO(&readFds);
+    FD_SET(sfd, &readFds);
+
+    timeval tv = {1, 0}; // 1 second timeout
+    int ready = select(sfd + 1, &readFds, nullptr, nullptr, &tv);
+
+    if (ready < 0) {
+        // perror("select error");
+        return "";
+    }
+    if (ready == 0) {
+        // std::cout << "no response from server?" << std::endl;
+        return "";
+    }
+
+    char buffer[1024];
+    sockaddr_in responderAddr;
+    socklen_t addrLen = sizeof(responderAddr);
+    ssize_t numBytes = recvfrom(sfd, buffer, sizeof(buffer), 0, (sockaddr*)&responderAddr, &addrLen);
+
+    if (numBytes > 0) {
+        buffer[numBytes] = '\0';
+    }
+    std::cout << "(got message from server: " << buffer << ")" << std::endl;
+    return buffer;
+}
 
 
 int main() {
@@ -149,9 +140,9 @@ int main() {
     // Start thread for reading user input and sending it to the server
     std::thread thread_client_listen([&]() {
         while (true) {
-            std::string input;
-            std::getline(std::cin, input);
-            client.send(input);
+            sleep(1);
+            std::string msg = client.read();
+            if (msg.empty()) continue;
         }
     });
 
