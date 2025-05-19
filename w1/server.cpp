@@ -81,13 +81,13 @@ public:
             std::string msg = result.get_sys_msg(SYSMSG_REGISTER);
             server.send("TODO Process reg " + msg, result.responder_sockaddr);
         } else if (result.starts(SYSMSG_SEND_TO_OTHERS)) {
-            std::string msg = result.get_sys_msg(SYSMSG_REGISTER);
+            std::string msg = result.get_sys_msg(SYSMSG_SEND_TO_OTHERS);
             server.send("TODO Process send " + msg, result.responder_sockaddr);
         } else if (result.starts(SYSMSG_MATHDUEL_INIT)) {
-            std::string msg = result.get_sys_msg(SYSMSG_REGISTER);
+            std::string msg = result.get_sys_msg(SYSMSG_MATHDUEL_INIT);
             server.send("TODO Process math init " + msg, result.responder_sockaddr);
         } else if (result.starts(SYSMSG_MATHDUEL_ANS)) {
-            std::string msg = result.get_sys_msg(SYSMSG_REGISTER);
+            std::string msg = result.get_sys_msg(SYSMSG_MATHDUEL_ANS);
             server.send("TODO Process math ans " + msg, result.responder_sockaddr);
         } else {
             server.send("Please use one of the commands as prefix to your message", result.responder_sockaddr);
