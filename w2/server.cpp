@@ -70,6 +70,8 @@ public:
                         break;
                 }
             }
+
+            // TODO if (event.channelID == CHANNEL_SERVER_PLAYERS_DATA) {
         }
     }
 
@@ -125,7 +127,28 @@ private:
         std::cout << "Got data from " << event.peer->address.host << ":" << event.peer->address.port << " - " << event.packet->data << std::endl;
         const char* data = reinterpret_cast<const char*>(event.packet->data);
 
-        // TODO player data, ping
+        if (event.channelID == CHANNEL_SERVER_PING) {
+            send(
+                "pong",
+                event.peer,
+                CHANNEL_SERVER_PING,
+                false
+            );
+            return;
+        }
+        if (event.channelID == CHANNEL_SERVER_PLAYERS_DATA) {
+            std::string msg(data);
+            std::vector<std::string> parsed = parse_from_receive(msg);
+            PlayerUseData use{ .pos = true, .ping = true };
+            Player player = Player::from_string_vector(parsed, use);
+            for (int i = 0; i < current_session.players.size(); ++i) {
+                if (current_session.players[i].peer == event.peer) {
+                    current_session.players[i].pos = player.pos;
+                    current_session.players[i].ping = player.ping;
+                }
+            }
+            return;
+        }
     }
 };
 
