@@ -47,29 +47,35 @@ public:
 };
 
 bool Client::connect(const std::string& server_name, int port) {
+    // Convert port to string
     std::string port_str = std::to_string(port);
     const char* port_cstr = port_str.c_str();
 
-    // Resolve server address
-    addrinfo hints, *res;
+    // Server parameters
+    addrinfo hints;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
 
+    // Server resolved
+    addrinfo* res;
     if (getaddrinfo(server_name.c_str(), port_cstr, &hints, &res) != 0) {
-        printf("Failed to resolve server address\n");
+        std::cout << "Client::connect - Failed to resolve server address" << std::endl;
         return false;
     }
 
+    // Save server address
     memcpy(&serverSockAddr, res->ai_addr, res->ai_addrlen);
     freeaddrinfo(res);
 
     // Create client socket
     sfd = create_dgram_socket(nullptr, "0", nullptr); // Bind to any available port
     if (sfd == -1) {
-        printf("Failed to create client socket\n");
+        std::cout << "Client::connect - Failed to create client socket" << std::endl;
         return false;
     }
+
+    // Set myself as connected
     connected = true;
     return true;
 }
