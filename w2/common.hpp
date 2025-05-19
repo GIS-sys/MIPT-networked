@@ -60,6 +60,9 @@ struct Vector2D {
         if (x == 0 && y == 0) return Vector2D();
         return *this / length();
     }
+
+    bool operator==(const Vector2D& other) const { return x == other.x && y == other.y; }
+    bool operator!=(const Vector2D& other) const { return !(*this == other); }
 };
 
 Vector2D operator*(float k, const Vector2D& vec) { return vec * k; }

@@ -124,7 +124,7 @@ private:
         ENetPacket* packet = enet_packet_create(message.c_str(), message.size() + 1, ENET_PACKET_FLAG_RELIABLE);
         enet_peer_send(peer, CHANNEL_LOBBY_START, packet);
 
-        std::cout << "Sent game server info to " << peer->address.host << ":" << peer->address.port << std::endl;
+        std::cout << "Sent game server info (" << SERVER_ADDR << ":" << SERVER_PORT << ") to " << peer->address.host << ":" << peer->address.port << std::endl;
     }
 };
 

@@ -36,9 +36,17 @@ public:
     }
 
     ~NetworkClient() {
-        if (client_host) {
-            enet_host_destroy(client_host);
+        if (lobby_peer) {
+            enet_peer_disconnect(lobby_peer, 0);
+            if (client_host) enet_host_flush(client_host);
         }
+        if (server_peer) {
+            enet_peer_disconnect(server_peer, 0);
+            if (client_host) enet_host_flush(client_host);
+        }
+        if (lobby_peer) enet_peer_reset(lobby_peer);
+        if (server_peer) enet_peer_reset(server_peer);
+        if (client_host) enet_host_destroy(client_host);
     }
 
     bool connect_to_lobby(const char* address, int port) {
@@ -162,12 +170,14 @@ public:
 
         // If enter is pressed, and not yet connected to the game server - send request to lobby
         if (enter && !is_connected_server()) {
+            std::cout << "Requesting game server address and port from lobby" << std::endl;
             send(SYSCMD_START, network_client.get_lobby_peer(), CHANNEL_LOBBY_START, true);
         }
 
         // If connected to the server - try to pass my position
         send_data_timer -= dt;
         if (is_connected_server() && send_data_timer < 0) {
+            // COUT
             send(prepare_for_send(me.to_string_vector({ .pos = true, .ping = true })), network_client.get_server_peer(), CHANNEL_SERVER_PLAYERS_DATA, true);
             send_data_timer = CLIENT_SEND_DATA_INTERVAL_MS / 1000;
         }
@@ -175,6 +185,7 @@ public:
         // Also update ping
         pinger.update(dt);
         if (is_connected_server() && pinger.need_ping()) {
+            std::cout << "Sending ping" << std::endl;
             pinger.sent();
             send("ping", network_client.get_server_peer(), CHANNEL_SERVER_PING, false);
         }
@@ -268,6 +279,7 @@ public:
             std::vector<std::string> parsed = parse_from_receive(msg);
             std::string server_addr = parsed[0];
             int server_port = std::atoi(parsed[1].c_str());
+            std::cout << "Connecting to game server: addr=" << server_addr << " port=" << server_port << std::endl;
             network_client.connect_to_server(server_addr.c_str(), server_port);
             return;
         }
@@ -284,15 +296,18 @@ public:
         if (event.channelID == CHANNEL_SERVER_PING) {
             pinger.got();
             me.ping = pinger.ping();
+            std::cout << "Got pong, current ping: " << me.ping << std::endl;
             return;
         }
         if (event.channelID == CHANNEL_SERVER_PLAYERS_LIST) {
+            std::cout << "Got new players list" << std::endl;
             std::string msg(msgData);
             std::vector<std::string> parsed = parse_from_receive(msg);
             PlayerUseData use{ .name = true, .id = true };
             players.clear();
             for (int i = 0; i < parsed.size(); i += use.length()) {
                 Player player = Player::from_string_vector(parsed, use, i);
+                std::cout << "\t" << player.id << ", " << player.name << std::endl;
                 players[player.id] = player;
             }
             return;
@@ -304,6 +319,11 @@ public:
             for (int i = 0; i < parsed.size(); i += use.length()) {
                 Player player = Player::from_string_vector(parsed, use, i);
                 if (players.find(player.id) != players.end()) {
+                    if (players[player.id].pos != player.pos) {
+                        std::cout << "Position has changed for player id=" << player.id << " - "
+                                  << "from " << players[player.id].pos.x << "," << players[player.id].pos.y << " "
+                                  << "to " << player.pos.x << "," << player.pos.y << std::endl;
+                    }
                     players[player.id].pos = player.pos;
                     players[player.id].ping = player.ping;
                 }

@@ -119,6 +119,7 @@ private:
     }
 
     void broadcast_player_data() {
+        // COUT
         if (DEBUG) std::cout << "Broadcasting player data" << std::endl;
         // Generate combined list of all other players except for currently chosen
         std::vector<std::string> players_list_vector;
@@ -155,6 +156,7 @@ private:
         const char* data = reinterpret_cast<const char*>(event.packet->data);
 
         if (event.channelID == CHANNEL_SERVER_PING) {
+            std::cout << "Sending pong to " << event.peer->address.host << ":" << event.peer->address.port << std::endl;
             send(
                 "pong",
                 event.peer,
@@ -170,6 +172,11 @@ private:
             Player player = Player::from_string_vector(parsed, use);
             for (int i = 0; i < current_session.players.size(); ++i) {
                 if (current_session.players[i].peer == event.peer) {
+                    if (current_session.players[i].pos != player.pos) {
+                        std::cout << "Position has changed for player id=" << current_session.players[i].id << " - "
+                                  << "from " << current_session.players[i].pos.x << "," << current_session.players[i].pos.y << " "
+                                  << "to " << player.pos.x << "," << player.pos.y << std::endl;
+                    }
                     current_session.players[i].pos = player.pos;
                     current_session.players[i].ping = player.ping;
                 }
