@@ -95,7 +95,7 @@ ReadResult Client::read() const {
     FD_SET(sfd, &readFds);
 
     // Timeout
-    timeval tv = {CLIENT_RECEIVE_TIMEOUT, 0};
+    timeval tv = {0, CLIENT_RECEIVE_TIMEOUT_US};
 
     // See if there are updates for any fd <= sfd
     int ready = select(sfd + 1, &readFds, nullptr, nullptr, &tv);
