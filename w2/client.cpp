@@ -43,17 +43,17 @@ struct Player {
     Vector2D pos;
     int ping = -1;
 
-    Player(const std::string& name, int id = -1, Vector2D pos = {}, int ping = -1)
+    Player(const std::string& name = "", int id = -1, Vector2D pos = {}, int ping = -1)
         : name(name), id(id), pos(pos), ping(ping) {}
 };
 
 
-struct NetworkAddress {
-    uint32_t host;
-    uint16_t port;
-
-    NetworkAddress(uint32_t h = 0, uint16_t p = 0) : host(h), port(p) {}
-};
+// struct NetworkAddress {
+//     uint32_t host;
+//     uint16_t port;
+// 
+//     NetworkAddress(uint32_t h = 0, uint16_t p = 0) : host(h), port(p) {}
+// };
 
 
 class NetworkClient {
@@ -97,13 +97,13 @@ public:
         return true;
     }
 
-    bool connect_to_server(const NetworkAddress& address) {
+    bool connect_to_server(const char* address, int port) {
         ENetAddress enetAddr;
-        enetAddr.host = address.host;
-        enetAddr.port = address.port;
+        enet_address_set_host(&enetAddr, address);
+        enetAddr.port = port;
 
         server_peer = enet_host_connect(client_host, &enetAddr, 3, 0);
-        if (!server_peer) {
+        if (!lobby_peer) {
             return false;
         }
         return true;
@@ -133,7 +133,7 @@ private:
     bool _is_connected_server = false;
 
 public:
-    Game(int width, int height, const char* name, int fps, const std::string& player_name) : me(player_name) {
+    Game(int width, int height, const char* name, int fps) {
         // Init GUI
         InitWindow(width, height, name);
 
@@ -154,7 +154,7 @@ public:
         me.pos.y = rand() % height;
 
         // Connect to lobby
-        if (!network_client.connect_to_lobby(LOBBY_ADDR, LOBBY_PORT)) {
+        if (!network_client.connect_to_lobby(LOBBY_ADDR.c_str(), LOBBY_PORT)) {
             throw std::runtime_error("Cannot connect to lobby");
         }
     }
@@ -196,7 +196,7 @@ public:
     }
 
     void render_player(const Player& player, int x, int y) const {
-        DrawText(("ID: " + std::to_string(me.id) + " " + me.name + " ping: " + std::to_string(me.ping)).c_str(), x, y, 20, WHITE);
+        DrawText(("ID: " + std::to_string(me.id) + " Name: " + me.name + " Ping: " + std::to_string(me.ping)).c_str(), x, y, 20, WHITE);
         DrawCircleV(player.pos, PLAYER_SIZE, WHITE);
     }
 
@@ -274,23 +274,35 @@ public:
         std::cout << "Got data from " << event.peer->address.host << ":" << event.peer->address.port << " - " << event.packet->data << std::endl;
 
         const char* msgData = reinterpret_cast<const char*>(event.packet->data);
+
+        // Decide what to do depending on the channel
+        if (event.channelID == CHANNEL_LOBBY_START) {
+            if (is_connected_server()) return;
+            // Parse lobby data to connect to server
+            std::string msg(msgData);
+            std::vector<std::string> parsed = parse_from_receive(msg);
+            std::string server_addr = parsed[0];
+            int server_port = std::atoi(parsed[1].c_str());
+            std::cout << "Connecting to server: " << server_addr << ":" << server_port << std::endl;
+            network_client.connect_to_server(server_addr.c_str(), server_port);
+            return;
+        }
         // TODO
+        if (event.channelID == CHANNEL_SERVER_PLAYER_CRED) {
+            // Parse player data
+            std::string msg(msgData);
+            std::vector<std::string> parsed = parse_from_receive(msg);
+            me.name = parsed[0];
+            me.id = std::atoi(parsed[1].c_str());
+            return;
+        }
     }
 };
 
 
 int main(int argc, const char **argv)
 {
-    std::string player_name;
-    if (argc == 2) {
-        player_name = argv[1];
-    } else {
-        std::cout << "You can pass argument - your name - to this script. Since you didn't do that, name will be chosen randomly for you" << std::endl;
-        player_name = "Player" + std::to_string(rand());
-    }
-    std::cout << "Starting game as " << player_name << std::endl;
-
-    Game game(WIDTH, HEIGHT, NAME, FPS, player_name);
+    Game game(WIDTH, HEIGHT, NAME, FPS);
     game.run();
 
     return 0;

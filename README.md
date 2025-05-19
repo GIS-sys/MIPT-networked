@@ -21,13 +21,13 @@ git submodule update --recursive --remote
 2) Launch servers and client
 
 ```bash
-./build/w2/client
+./build/w2/w2_lobby
 ```
 
 ```bash
-./build/w2/lobby
+./build/w2/w2_server
 ```
 
 ```bash
-./build/w2/server
+./build/w2/w2_client
 ```

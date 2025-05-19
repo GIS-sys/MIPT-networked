@@ -10,6 +10,7 @@
 #include "common.hpp"
 
 
+// //        player_name = "Player" + std::to_string(rand());
 struct Player {
     ENetPeer* peer;
 };
@@ -21,40 +22,40 @@ struct GameSession {
 };
 
 
-class LobbyServer {
+class GameServer {
 private:
-    ENetHost* lobby_host;
+    ENetHost* game_host;
     GameSession current_session;
 
 public:
-    LobbyServer() {
+    GameServer() {
         if (enet_initialize() != 0) {
             throw std::runtime_error("Cannot init ENet");
         }
         atexit(enet_deinitialize);
 
         ENetAddress address;
-        enet_address_set_host(&address, LOBBY_ADDR.c_str());
-        address.port = LOBBY_PORT;
+        enet_address_set_host(&address, SERVER_ADDR.c_str());
+        address.port = SERVER_PORT;
 
-        lobby_host = enet_host_create(&address, MAX_PLAYERS, 2, 0, 0);
-        if (!lobby_host) {
-            throw std::runtime_error("Cannot create lobby host");
+        game_host = enet_host_create(&address, MAX_PLAYERS, 2, 0, 0);
+        if (!game_host) {
+            throw std::runtime_error("Cannot create game host");
         }
 
-        std::cout << "Lobby server started on port " << LOBBY_PORT << std::endl;
+        std::cout << "Game server started on port " << SERVER_PORT << std::endl;
     }
 
-    ~LobbyServer() {
-        if (lobby_host) {
-            enet_host_destroy(lobby_host);
+    ~GameServer() {
+        if (game_host) {
+            enet_host_destroy(game_host);
         }
     }
 
     void run() {
         ENetEvent event;
         while (true) {
-            while (enet_host_service(lobby_host, &event, LOBBY_SERVICE_TIMEOUT_MS) > 0) {
+            while (enet_host_service(game_host, &event, SERVER_SERVICE_TIMEOUT_MS) > 0) {
                 switch (event.type) {
                     case ENET_EVENT_TYPE_CONNECT:
                         std::cout << "Connected: " << event.peer->address.host << ":" << event.peer->address.port << std::endl;
@@ -81,9 +82,6 @@ public:
 private:
     void handle_connect(const ENetEvent& event) {
         current_session.players.push_back(Player(event.peer));
-        if (current_session.active) {
-            send_game_server_info(event.peer);
-        }
     }
 
     void handle_disconnect(const ENetEvent& event) {
@@ -102,40 +100,13 @@ private:
         std::cout << "Got data from " << event.peer->address.host << ":" << event.peer->address.port << " - " << event.packet->data << std::endl;
         const char* data = reinterpret_cast<const char*>(event.packet->data);
 
-        if (data == SYSCMD_START) {
-            handle_start_command(event.peer);
-        } else {
-            std::cout << "Got unexpected command from client" << std::endl;
-        }
-    }
-
-    void handle_start_command(ENetPeer* peer) {
-        // If game has already started - just ignore
-        if (current_session.active) {
-            return;
-        }
-
-        // Start the session
-        current_session.active = true;
-
-        // Notify all connected peers about the game server
-        for (const auto& player : current_session.players) {
-            send_game_server_info(player.peer);
-        }
-    }
-
-    void send_game_server_info(ENetPeer* peer) {
-        std::string message = prepare_for_send({SERVER_ADDR, std::to_string(SERVER_PORT)});
-        ENetPacket* packet = enet_packet_create(message.c_str(), message.size() + 1, ENET_PACKET_FLAG_RELIABLE);
-        enet_peer_send(peer, CHANNEL_LOBBY_START, packet);
-
-        std::cout << "Sent game server info to " << peer->address.host << ":" << peer->address.port << std::endl;
+        // TODO
     }
 };
 
 
 int main() {
-    LobbyServer server;
+    GameServer server;
     server.run();
 
     return 0;
