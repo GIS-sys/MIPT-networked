@@ -14,6 +14,9 @@ static const char* NAME = "w2 MIPT networked";
 static const int FPS = 60;
 static const float PLAYER_SPEED = 100;
 static const float PLAYER_SIZE = 5;
+static const char* LOBBY_ADDR = "localhost";
+static const float LOBBY_PORT = 2025;
+static const int LOBBY_RECONNECT_TIMEOUT = 1;
 
 
 struct Vector2D {
@@ -55,10 +58,82 @@ struct Player {
 };
 
 
+
+
+
+struct NetworkAddress {
+    uint32_t host;
+    uint16_t port;
+
+    NetworkAddress(uint32_t h = 0, uint16_t p = 0) : host(h), port(p) {}
+};
+
+
+class NetworkClient {
+private:
+    ENetHost* client_host = nullptr;
+    ENetPeer* lobby_peer = nullptr;
+    ENetPeer* server_peer = nullptr;
+
+    bool _is_connected_lobby = false;
+    bool _is_connected_server = false;
+
+public:
+    bool is_connected_lobby() const { return _is_connected_lobby; }
+    bool is_connected_server() const { return _is_connected_server; }
+
+    NetworkClient() {
+        if (enet_initialize() != 0) {
+            throw std::runtime_error("Cannot init ENet");
+        }
+        atexit(enet_deinitialize);
+
+        client_host = enet_host_create(nullptr, 2, 3, 0, 0);
+        if (!client_host) {
+            throw std::runtime_error("Cannot create client host");
+        }
+    }
+
+    ~NetworkClient() {
+        if (client_host) {
+            enet_host_destroy(client_host);
+        }
+    }
+
+    bool connectToLobby(const char* address, int port) {
+        ENetAddress enetAddr;
+        enet_address_set_host(&enetAddr, address);
+        enetAddr.port = port;
+
+        lobby_peer = enet_host_connect(client_host, &enetAddr, 1, 0);
+        if (!lobby_peer) {
+            return false;
+        }
+        return true;
+    }
+
+    bool connectToServer(const NetworkAddress& address) {
+        ENetAddress enetAddr;
+        enetAddr.host = address.host;
+        enetAddr.port = address.port;
+
+        server_peer = enet_host_connect(client_host, &enetAddr, 3, 0);
+        if (!server_peer) {
+            return false;
+        }
+        return true;
+    }
+};
+
+
+
+
+
 class Game {
 private:
     std::map<int, Player> players;
     Player me;
+    NetworkClient network_client;
 
 public:
     Game(int width, int height, const char* name, int fps, const std::string& player_name) : me(player_name) {
@@ -80,10 +155,16 @@ public:
         // Initialize player position
         me.pos.x = rand() % width;
         me.pos.y = rand() % height;
+
+        // Connect to lobby
+        while (!network_client.connectToLobby(LOBBY_ADDR, LOBBY_PORT)) {
+            std::cout << "Failed to connect to lobby; retrying in " << LOBBY_RECONNECT_TIMEOUT << "seconds" << std::endl;
+            sleep(LOBBY_RECONNECT_TIMEOUT);
+        }
     }
 
-    bool is_connected_lobby() const { return false; }
-    bool is_connected_server() const { return false; }
+    bool is_connected_lobby() const { return network_client.is_connected_lobby(); }
+    bool is_connected_server() const { return network_client.is_connected_server(); }
 
     ~Game() {
         CloseWindow();
@@ -206,8 +287,8 @@ int main(int argc, const char **argv)
   enet_address_set_host(&address, "localhost");
   address.port = 10887;
 
-  ENetPeer *lobbyPeer = enet_host_connect(client, &address, 2, 0);
-  if (!lobbyPeer)
+  ENetPeer *lobby_peer = enet_host_connect(client, &address, 2, 0);
+  if (!lobby_peer)
   {
     printf("Cannot connect to lobby");
     return 1;
@@ -247,12 +328,12 @@ int main(int argc, const char **argv)
       if (curTime - lastFragmentedSendTime > 1000)
       {
         lastFragmentedSendTime = curTime;
-        send_fragmented_packet(lobbyPeer);
+        send_fragmented_packet(lobby_peer);
       }
       if (curTime - lastMicroSendTime > 100)
       {
         lastMicroSendTime = curTime;
-        send_micro_packet(lobbyPeer);
+        send_micro_packet(lobby_peer);
       }
     }
     bool left = IsKeyDown(KEY_LEFT);
