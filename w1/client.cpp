@@ -11,6 +11,7 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <thread>
 #include <unistd.h>
 
 #include "socket_tools.h"
@@ -35,8 +36,6 @@ public:
     }
 
     bool connect(const std::string& server_name, int port);
-    void start_listening();
-    void start_reading();
 
     void reset() {
         connected = false;
@@ -44,6 +43,15 @@ public:
         if (sfd != -1) close(sfd);
         sfd = -1;
     }
+
+    ssize_t send(const std::string& msg) const {
+        std::cout << "(sending message: " << msg << ")" << std::endl;
+        ssize_t res = sendto(sfd, msg.c_str(), msg.size(), 0, (sockaddr*)&serverSockAddr, sizeof(serverSockAddr));
+        if (res == -1) std::cout << strerror(errno) << std::endl;
+        return res;
+    }
+
+    std::string read() const;
 };
 
 bool Client::connect(const std::string& server_name, int port) {
@@ -81,15 +89,10 @@ bool Client::connect(const std::string& server_name, int port) {
 }
 
 void Client::start_listening() {
-    // TODO
-}
-
-void Client::start_reading() {
     std::string pingMsgStr = "ping";
     pingMsgStr += id;
-    const char *pingMsg = pingMsgStr.c_str();
-    printf("Sending 'ping' to server...\n");
-    sendto(sfd, pingMsg, strlen(pingMsg), 0, (sockaddr*)&serverSockAddr, sizeof(serverSockAddr));
+
+    send(pingMsgStr);
 
     while (true) {
         fd_set readFds;
@@ -103,10 +106,8 @@ void Client::start_reading() {
             perror("select error");
             break;
         } else if (ready == 0) {
-            // Timeout: resend ping
-            printf("No response, resending 'ping'...\n");
-            std::cout << pingMsgStr << std::endl;
-            sendto(sfd, pingMsg, strlen(pingMsg), 0, (sockaddr*)&serverSockAddr, sizeof(serverSockAddr));
+            std::cout << "no response from server?" << std::endl;
+            send(pingMsgStr);
         } else {
             char buffer[1024];
             sockaddr_in responderAddr;
@@ -118,7 +119,7 @@ void Client::start_reading() {
                 printf("Received '%s' from server. Sending 'ping' again...\n", buffer);
                 std::cout << pingMsgStr << std::endl;
                 sleep(1);
-                sendto(sfd, pingMsg, strlen(pingMsg), 0, (sockaddr*)&responderAddr, addrLen);
+                send(pingMsgStr);
             }
         }
     }
@@ -136,11 +137,28 @@ int main() {
         return 1;
     }
 
-    client.start_listening();
-    client.start_reading();
+    // Start thread for reading user input and sending it to the server
+    std::thread thread_user_read([&]() {
+        while (true) {
+            std::string input;
+            std::getline(std::cin, input);
+            client.send(input);
+        }
+    });
 
+    // Start thread for reading user input and sending it to the server
+    std::thread thread_client_listen([&]() {
+        while (true) {
+            std::string input;
+            std::getline(std::cin, input);
+            client.send(input);
+        }
+    });
+
+    // Wait till the end
     while (client.is_connected()) {}
-
+    thread_user_read.join();
+    thread_client_listen.join();
     client.reset();
 
     return 0;
