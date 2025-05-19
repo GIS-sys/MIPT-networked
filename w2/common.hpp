@@ -97,9 +97,9 @@ struct Player {
         return res;
     }
 
-    static Player from_string_vector(const std::vector<std::string>& strings, PlayerUseData use = {}) {
+    static Player from_string_vector(const std::vector<std::string>& strings, PlayerUseData use = {}, int start_i = 0) {
         Player player;
-        int i = 0;
+        int i = start_i;
         if (use.name) player.name = strings[i++];
         if (use.id) player.id = std::atoi(strings[i++].c_str());
         if (use.pos) player.pos.x = std::atoi(strings[i++].c_str());

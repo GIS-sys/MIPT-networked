@@ -178,7 +178,7 @@ public:
     }
 
     void render_player(const Player& player, int x, int y) const {
-        DrawText(("ID: " + std::to_string(me.id) + " Name: " + me.name + " Ping: " + std::to_string(me.ping)).c_str(), x, y, 20, WHITE);
+        DrawText(("ID: " + std::to_string(player.id) + " Name: " + player.name + " Ping: " + std::to_string(player.ping)).c_str(), x, y, 20, WHITE);
         DrawCircleV(to_vector2(player.pos), PLAYER_SIZE, WHITE);
     }
 
@@ -205,6 +205,7 @@ public:
             DrawText("List of players:", 20, 100, 20, WHITE);
             int i = 0;
             for (const auto& player_it : players) {
+                std::cout << player_it.second.id << " ";
                 render_player(player_it.second, 40, 140 + 20 * i);
                 ++i;
             }
@@ -253,7 +254,7 @@ public:
     }
 
     void handlePacket(const ENetEvent& event) {
-        std::cout << "Got data from " << event.peer->address.host << ":" << event.peer->address.port << " - " << event.packet->data << std::endl;
+        std::cout << "Got data from ch=" << (int)event.channelID << " " << event.peer->address.host << ":" << event.peer->address.port << " - " << event.packet->data << std::endl;
 
         const char* msgData = reinterpret_cast<const char*>(event.packet->data);
 
@@ -288,9 +289,12 @@ public:
             std::string msg(msgData);
             std::vector<std::string> parsed = parse_from_receive(msg);
             PlayerUseData use{ .name = true, .id = true };
+            players.clear();
+            std::cout << "!!!" << parsed.size() << " " << use.length() << std::endl;
             for (int i = 0; i < parsed.size(); i += use.length()) {
-                Player player = Player::from_string_vector(parsed, use);
+                Player player = Player::from_string_vector(parsed, use, i);
                 players[player.id] = player;
+                std::cout << "@@@" << player.id << std::endl;
             }
             return;
         }
@@ -299,7 +303,7 @@ public:
             std::vector<std::string> parsed = parse_from_receive(msg);
             PlayerUseData use{ .name = true, .id = true, .pos = true, .ping = true };
             for (int i = 0; i < parsed.size(); i += use.length()) {
-                Player player = Player::from_string_vector(parsed, use);
+                Player player = Player::from_string_vector(parsed, use, i);
                 if (players.find(player.id) != players.end()) {
                     players[player.id].pos = player.pos;
                     players[player.id].ping = player.ping;
@@ -313,6 +317,7 @@ public:
 
 int main(int argc, const char **argv)
 {
+    srand(time({}));
     Game game(WIDTH, HEIGHT, NAME, FPS);
     game.run();
 

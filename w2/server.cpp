@@ -84,6 +84,28 @@ private:
             CHANNEL_SERVER_PLAYER_CRED,
             true
         );
+
+        // Send list of all players
+        broadcast_player_lists();
+    }
+
+    void broadcast_player_lists() {
+        for (int i = 0; i < current_session.players.size(); ++i) {
+            // Generate combined list of all other players except for currently chosen
+            std::vector<std::string> players_list_vector;
+            for (int j = 0; j < current_session.players.size(); ++j) {
+                if (i == j) continue;
+                std::vector<std::string> a = current_session.players[j].to_string_vector({ .name = true, .id = true});
+                players_list_vector.insert(players_list_vector.end(), a.begin(), a.end());
+            }
+            // Send to currently chosen player
+            send(
+                prepare_for_send(players_list_vector),
+                current_session.players[i].peer,
+                CHANNEL_SERVER_PLAYERS_LIST,
+                true
+            );
+        }
     }
 
     void handle_disconnect(const ENetEvent& event) {
@@ -95,6 +117,7 @@ private:
 
         if (it != current_session.players.end()) {
             current_session.players.erase(it);
+            broadcast_player_lists();
         }
     }
 
@@ -102,7 +125,7 @@ private:
         std::cout << "Got data from " << event.peer->address.host << ":" << event.peer->address.port << " - " << event.packet->data << std::endl;
         const char* data = reinterpret_cast<const char*>(event.packet->data);
 
-        // TODO
+        // TODO player data, ping
     }
 };
 
