@@ -12,12 +12,13 @@ static const int HEIGHT = 600;
 static const int WIDTH = 800;
 static const char* NAME = "w2 MIPT networked";
 static const int FPS = 60;
-static const float PLAYER_SPEED = 50;
+static const float PLAYER_SPEED = 100;
 static const float PLAYER_SIZE = 5;
 
 
 struct Vector2D {
-    float x, y;
+    float x;
+    float y;
 
     Vector2D() : x(0), y(0) {}
     Vector2D(float x, float y) : x(x), y(y) {}
@@ -29,7 +30,10 @@ struct Vector2D {
 
     float norm() const { return x * x + y * y; }
     float length() const { return std::sqrt(norm()); }
-    Vector2D normalize() const { return *this / length(); }
+    Vector2D normalize() const {
+        if (x == 0 && y == 0) return Vector2D();
+        return *this / length();
+    }
 
     operator Vector2() const { return { x, y }; }
 };
