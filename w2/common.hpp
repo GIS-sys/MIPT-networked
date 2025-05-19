@@ -63,6 +63,13 @@ Vector2D operator*(float k, const Vector2D& vec) { return vec * k; }
 Vector2D operator/(float k, const Vector2D& vec) { return vec / k; }
 
 
+struct PlayerUseData {
+    bool name = false;
+    bool id = false;
+    bool pos = false;
+    bool ping = false;
+};
+
 struct Player {
     ENetPeer* peer;
 
@@ -76,17 +83,26 @@ struct Player {
     Player(ENetPeer* peer = nullptr, const std::string& name = "", int id = -1, Vector2D pos = {}, int ping = -1)
         : peer(peer), name(name), id(id), pos(pos), ping(ping) {}
 
-    std::vector<std::string> to_string_vector() const {
-        return {name, std::to_string(id), std::to_string(pos.x), std::to_string(pos.y), std::to_string(ping)};
+
+
+    std::vector<std::string> to_string_vector(PlayerUseData use = {}) const {
+        std::vector<std::string> res;
+        if (use.name) res.push_back(name);
+        if (use.id) res.push_back(std::to_string(id));
+        if (use.pos) res.push_back(std::to_string(pos.x));
+        if (use.pos) res.push_back(std::to_string(pos.y));
+        if (use.ping) res.push_back(std::to_string(ping));
+        return res;
     }
 
-    static Player from_string_vector(const std::vector<std::string>& strings) {
+    static Player from_string_vector(const std::vector<std::string>& strings, PlayerUseData use = {}) {
         Player player;
-        player.name = strings[0];
-        player.id = std::atoi(strings[1].c_str());
-        player.pos.x = std::atoi(strings[2].c_str());
-        player.pos.y = std::atoi(strings[3].c_str());
-        player.ping = std::atoi(strings[4].c_str());
+        int i = 0;
+        if (use.name) player.name = strings[i++];
+        if (use.id) player.id = std::atoi(strings[i++].c_str());
+        if (use.pos) player.pos.x = std::atoi(strings[i++].c_str());
+        if (use.pos) player.pos.y = std::atoi(strings[i++].c_str());
+        if (use.ping) player.ping = std::atoi(strings[i++].c_str());
         return player;
     }
 

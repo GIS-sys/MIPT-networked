@@ -166,7 +166,7 @@ public:
 
         // If connected to the server - try to pass my position
         if (is_connected_server()) {
-            send(prepare_for_send(me.to_string_vector()), network_client.get_server_peer(), CHANNEL_SERVER_PLAYER_DATA, true);
+            send(prepare_for_send(me.to_string_vector({ .pos = true, .ping = true })), network_client.get_server_peer(), CHANNEL_SERVER_PLAYER_DATA, true);
         }
 
         // Also update ping
@@ -273,7 +273,7 @@ public:
             // Parse player data
             std::string msg(msgData);
             std::vector<std::string> parsed = parse_from_receive(msg);
-            Player player_data = Player::from_string_vector(parsed);
+            Player player_data = Player::from_string_vector(parsed, { .name = true, .id = true });
             me.id = player_data.id;
             me.name = player_data.name;
             std::cout << "Got new credentials: name=" << me.name << " id=" << me.id << std::endl;

@@ -79,7 +79,7 @@ private:
         player.generate_random_credentials();
         current_session.players.push_back(player);
         send(
-            prepare_for_send(player.to_string_vector()),
+            prepare_for_send(player.to_string_vector({ .name = true, .id = true })),
             player.peer,
             CHANNEL_SERVER_PLAYER_CRED,
             true
