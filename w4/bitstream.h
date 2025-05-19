@@ -4,6 +4,8 @@
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
+#include <enet/enet.h>
+
 
 class BitStream {
     // Stores everything in array data
@@ -113,4 +115,10 @@ public:
     size_t skip() const { return _skip; }
 
     operator bool() const { return _size != 0; }
+
+    ENetPacket* to_enet_packet(_ENetPacketFlag reliable_flag) const {
+        ENetPacket *packet = enet_packet_create(nullptr, _size, reliable_flag);
+        memcpy(packet->data, _data + _skip, _size);
+        return packet;
+    }
 };

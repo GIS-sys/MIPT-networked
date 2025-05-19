@@ -1,12 +1,13 @@
 #include "protocol.h"
 #include <cstring> // memcpy
+#include "bitstream.h"
 
 void send_join(ENetPeer *peer)
 {
-  ENetPacket *packet = enet_packet_create(nullptr, sizeof(uint8_t), ENET_PACKET_FLAG_RELIABLE);
-  *packet->data = E_CLIENT_TO_SERVER_JOIN;
+    BitStream bs;
+    bs << E_CLIENT_TO_SERVER_JOIN;
 
-  enet_peer_send(peer, 0, packet);
+    enet_peer_send(peer, 0, bs.to_enet_packet(ENET_PACKET_FLAG_RELIABLE));
 }
 
 void send_new_entity(ENetPeer *peer, const Entity &ent)
