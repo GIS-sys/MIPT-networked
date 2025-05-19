@@ -22,9 +22,9 @@ static const int CLIENT_PING_INTERVAL_MS = 1000;
 static const std::string SYSCMD_START = "START";
 static const int CHANNEL_LOBBY_START = 0;
 static const int CHANNEL_SERVER_PING = 1;
-static const int CHANNEL_SERVER_PLAYER_LIST = 2;
+static const int CHANNEL_SERVER_PLAYERS_LIST = 2;
 static const int CHANNEL_SERVER_PLAYER_CRED = 3;
-static const int CHANNEL_SERVER_PLAYER_DATA = 4;
+static const int CHANNEL_SERVER_PLAYERS_DATA = 4;
 static const int CHANNELS_AMOUNT = 5;
 static const std::string LOBBY_ADDR = "localhost";
 static const int LOBBY_PORT = 10887;
@@ -68,6 +68,8 @@ struct PlayerUseData {
     bool id = false;
     bool pos = false;
     bool ping = false;
+
+    int length() const { return name * 1 + id * 1 + pos * 2 + ping * 1; }
 };
 
 struct Player {

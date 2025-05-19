@@ -166,7 +166,7 @@ public:
 
         // If connected to the server - try to pass my position
         if (is_connected_server()) {
-            send(prepare_for_send(me.to_string_vector({ .pos = true, .ping = true })), network_client.get_server_peer(), CHANNEL_SERVER_PLAYER_DATA, true);
+            send(prepare_for_send(me.to_string_vector({ .pos = true, .ping = true })), network_client.get_server_peer(), CHANNEL_SERVER_PLAYERS_DATA, true);
         }
 
         // Also update ping
@@ -279,10 +279,33 @@ public:
             std::cout << "Got new credentials: name=" << me.name << " id=" << me.id << std::endl;
             return;
         }
-        // TODO
         if (event.channelID == CHANNEL_SERVER_PING) {
             pinger.got();
             me.ping = pinger.ping();
+            return;
+        }
+        if (event.channelID == CHANNEL_SERVER_PLAYERS_LIST) {
+            std::string msg(msgData);
+            std::vector<std::string> parsed = parse_from_receive(msg);
+            PlayerUseData use{ .name = true, .id = true };
+            for (int i = 0; i < parsed.size(); i += use.length()) {
+                Player player = Player::from_string_vector(parsed, use);
+                players[player.id] = player;
+            }
+            return;
+        }
+        if (event.channelID == CHANNEL_SERVER_PLAYERS_DATA) {
+            std::string msg(msgData);
+            std::vector<std::string> parsed = parse_from_receive(msg);
+            PlayerUseData use{ .name = true, .id = true, .pos = true, .ping = true };
+            for (int i = 0; i < parsed.size(); i += use.length()) {
+                Player player = Player::from_string_vector(parsed, use);
+                if (players.find(player.id) != players.end()) {
+                    players[player.id].pos = player.pos;
+                    players[player.id].ping = player.ping;
+                }
+            }
+            return;
         }
     }
 };
