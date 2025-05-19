@@ -15,6 +15,11 @@ static const int SERVER_SLEEP_BETWEEN_RECEIVE = 0;
 static const int SERVER_RECEIVE_TIMEOUT_US = 100'000;
 static const int MESSAGE_BUFFER_SIZE = 1024;
 
+static const std::string SYSMSG_REGISTER = "/REG";
+static const std::string SYSMSG_SEND_TO_OTHERS = "/c";
+static const std::string SYSMSG_MATHDUEL_INIT = "/mathduel";
+static const std::string SYSMSG_MATHDUEL_ANS = "/ans";
+
 
 struct ReadResult {
     std::string msg;
@@ -27,6 +32,10 @@ struct ReadResult {
 
     char* get_responder_addr() const { return calc_responder_addr(responder_sockaddr); };
     int get_responder_port() const { return calc_responder_port(responder_sockaddr); };
+
+    bool starts(const std::string& sysmsg) const { return msg.rfind(sysmsg, 0) == 0; }
+    std::string get_sys_msg(const std::string& sysmsg) const { return msg.substr(sysmsg.length()); }
+
 };
 
 

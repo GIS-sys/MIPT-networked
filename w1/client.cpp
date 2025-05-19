@@ -79,6 +79,10 @@ bool Client::connect(const std::string& server_name, int port) {
 
     // Set myself as connected
     connected = true;
+
+    // Send registration message
+    send(SYSMSG_REGISTER + id);
+
     return true;
 }
 
