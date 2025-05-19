@@ -1,5 +1,6 @@
 #include <arpa/inet.h>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <fcntl.h>
@@ -87,6 +88,10 @@ protected:
     std::string _question;
     std::string _answer;
 
+    static const int MIN_RESULT = 20;
+    static const int MAX_RESULT = 99;
+    static const int MIN_TERM = 10;  // <= MIN_RESULT / 2
+
 public:
     MathDuel() = default;
     MathDuel(ClientState participant) { add_opponent(participant); }
@@ -105,8 +110,11 @@ public:
     void add_opponent(ClientState participant) {
         _participants.push_back(participant);
         if (_participants.size() == 2) {
-            _question = "TODO";
-            _answer = "TODO";
+            int result = (rand() % (MAX_RESULT - MIN_RESULT + 1)) + MIN_RESULT;
+            int a = (rand() % (result - 2 * MIN_TERM + 1)) + MIN_TERM;
+            int b = result - a;
+            _question = std::to_string(a) + " + " + std::to_string(b) + " = ?";
+            _answer = std::to_string(result);
         }
     }
 
