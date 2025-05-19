@@ -137,8 +137,15 @@ public:
         // Connect and chat between clients
         if (result.starts(SYSMSG_SEND_TO_OTHERS)) {
             std::string msg = result.get_sys_msg(SYSMSG_SEND_TO_OTHERS);
-            server.send("TODO Process send " + msg, result.responder_sockaddr);
-        } else if (result.starts(SYSMSG_MATHDUEL_INIT)) {
+            for (const auto& client_other : clients) {
+                if (client_other.second.id == client.id) continue; // Don't send to yourself
+                server.send("Message from " + client.to_string() + ": " + msg, client_other.second.my_sockaddr);
+            }
+            return;
+        }
+
+        // Process math duel
+        if (result.starts(SYSMSG_MATHDUEL_INIT)) {
             std::string msg = result.get_sys_msg(SYSMSG_MATHDUEL_INIT);
             server.send("TODO Process math init " + msg, result.responder_sockaddr);
         } else if (result.starts(SYSMSG_MATHDUEL_ANS)) {
