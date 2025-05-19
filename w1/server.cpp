@@ -4,6 +4,7 @@
 #include <ctime>
 #include <fcntl.h>
 #include <iostream>
+#include <map>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <random>
@@ -13,6 +14,7 @@
 #include <sys/types.h>
 #include <thread>
 #include <unistd.h>
+#include <utility>
 
 #include "common.h"
 #include "socket_tools.h"
@@ -69,18 +71,71 @@ ReadResult Server::read() const {
 }
 
 
+struct ClientState {
+    int port;
+    std::string addr;
+    int id;
+    sockaddr_in my_sockaddr;
+
+    std::string to_string() const { return std::to_string(id) + "(" + addr + ":" + std::to_string(port) + ")"; }
+};
+
+
 class StateMachine {
 protected:
     Server& server;
+
+    std::map<std::pair<int, std::string>, ClientState> clients;
 
 public:
     StateMachine(Server& server) : server(server) {}
 
     void process(const ReadResult& result) {
+        // ID to find in clients map
+        std::pair<int, std::string> client_state_id = {
+            result.get_responder_port(),
+            result.get_responder_addr()
+        };
+
+        // Register or unregister
         if (result.starts(SYSMSG_REGISTER)) {
             std::string msg = result.get_sys_msg(SYSMSG_REGISTER);
-            server.send("TODO Process reg " + msg, result.responder_sockaddr);
-        } else if (result.starts(SYSMSG_SEND_TO_OTHERS)) {
+
+            if (clients.find(client_state_id) != clients.end()) {
+                server.send("Client with such address and port was already registered!", result.responder_sockaddr);
+                return;
+            }
+            ClientState new_client_state {
+                .port = result.get_responder_port(),
+                .addr = result.get_responder_addr(),
+                .id = std::atoi(msg.c_str()),
+                .my_sockaddr = result.responder_sockaddr
+            };
+            clients[client_state_id] = new_client_state;
+            server.send("Registration for " + new_client_state.to_string()  + " succesfull!", result.responder_sockaddr);
+            return;
+        }
+        if (result.starts(SYSMSG_UNREGISTER)) {
+            std::string msg = result.get_sys_msg(SYSMSG_UNREGISTER);
+
+            if (clients.find(client_state_id) == clients.end()) {
+                server.send("No client with such address and port has been registered!", result.responder_sockaddr);
+                return;
+            }
+            server.send("Client " + clients[client_state_id].to_string()  + " was unregistered", result.responder_sockaddr);
+            clients.erase(client_state_id);
+            return;
+        }
+
+        // Check if registered and find the client
+        if (clients.find(client_state_id) == clients.end()) {
+            server.send("Please, register first bu using command " + SYSMSG_REGISTER + "{id}", result.responder_sockaddr);
+            return;
+        }
+        ClientState& client = clients[client_state_id];
+
+        // Connect and chat between clients
+        if (result.starts(SYSMSG_SEND_TO_OTHERS)) {
             std::string msg = result.get_sys_msg(SYSMSG_SEND_TO_OTHERS);
             server.send("TODO Process send " + msg, result.responder_sockaddr);
         } else if (result.starts(SYSMSG_MATHDUEL_INIT)) {

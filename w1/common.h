@@ -16,6 +16,7 @@ static const int SERVER_RECEIVE_TIMEOUT_US = 100'000;
 static const int MESSAGE_BUFFER_SIZE = 1024;
 
 static const std::string SYSMSG_REGISTER = "/REG";
+static const std::string SYSMSG_UNREGISTER = "/UNREG";
 static const std::string SYSMSG_SEND_TO_OTHERS = "/c";
 static const std::string SYSMSG_MATHDUEL_INIT = "/mathduel";
 static const std::string SYSMSG_MATHDUEL_ANS = "/ans";
