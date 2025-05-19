@@ -7,18 +7,7 @@
 #include <vector>
 #include <format>
 
-static const char* LOBBY_ADDR = "localhost";
-static const float LOBBY_PORT = 10887;
-static const char* SERVER_ADDR = "localhost";
-static const int SERVER_PORT = 10888;
-static const int MAX_PLAYERS = 64;
-static const int LOBNY_SERVICE_TIMEOUT_MS = 100;
-static const std::string SYSCMD_START = "START";
-static const int CHANNEL_LOBBY_START = 0;
-static const int CHANNEL_SERVER_PING = 1;
-static const int CHANNEL_SERVER_PLAYER_LIST = 2;
-static const int CHANNEL_SERVER_PLAYER_CRED = 3;
-static const int CHANNEL_SERVER_PLAYER_DATA = 4;
+#include "common.hpp"
 
 
 struct Player {
@@ -65,7 +54,7 @@ public:
     void run() {
         ENetEvent event;
         while (true) {
-            while (enet_host_service(lobby_host, &event, LOBNY_SERVICE_TIMEOUT_MS) > 0) {
+            while (enet_host_service(lobby_host, &event, LOBBY_SERVICE_TIMEOUT_MS) > 0) {
                 switch (event.type) {
                     case ENET_EVENT_TYPE_CONNECT:
                         std::cout << "Connected: " << event.peer->address.host << ":" << event.peer->address.port << std::endl;
