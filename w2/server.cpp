@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <iostream>
 #include <enet/enet.h>
@@ -20,6 +21,7 @@ class GameServer {
 private:
     ENetHost* game_host;
     GameSession current_session;
+    uint64_t send_data_timer = 0;
 
 public:
     GameServer() {
@@ -69,9 +71,14 @@ public:
                     default:
                         break;
                 }
-            }
 
-            // TODO if (event.channelID == CHANNEL_SERVER_PLAYERS_DATA) {
+                uint64_t current = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+                uint64_t dt = current - send_data_timer;
+                if (dt > SERVER_SEND_DATA_INTERVAL_MS * 1000) {
+                    broadcast_player_data();
+                    send_data_timer = current;
+                }
+            }
         }
     }
 
@@ -92,12 +99,13 @@ private:
     }
 
     void broadcast_player_lists() {
+        std::cout << "Broadcasting player lists" << std::endl;
         for (int i = 0; i < current_session.players.size(); ++i) {
             // Generate combined list of all other players except for currently chosen
             std::vector<std::string> players_list_vector;
             for (int j = 0; j < current_session.players.size(); ++j) {
                 if (i == j) continue;
-                std::vector<std::string> a = current_session.players[j].to_string_vector({ .name = true, .id = true});
+                std::vector<std::string> a = current_session.players[j].to_string_vector({ .name = true, .id = true });
                 players_list_vector.insert(players_list_vector.end(), a.begin(), a.end());
             }
             // Send to currently chosen player
@@ -106,6 +114,25 @@ private:
                 current_session.players[i].peer,
                 CHANNEL_SERVER_PLAYERS_LIST,
                 true
+            );
+        }
+    }
+
+    void broadcast_player_data() {
+        if (DEBUG) std::cout << "Broadcasting player data" << std::endl;
+        // Generate combined list of all other players except for currently chosen
+        std::vector<std::string> players_list_vector;
+        for (int j = 0; j < current_session.players.size(); ++j) {
+            std::vector<std::string> a = current_session.players[j].to_string_vector({ .name = true, .id = true, .pos = true, .ping = true });
+            players_list_vector.insert(players_list_vector.end(), a.begin(), a.end());
+        }
+        for (int i = 0; i < current_session.players.size(); ++i) {
+            // Send to currently chosen player
+            send(
+                prepare_for_send(players_list_vector),
+                current_session.players[i].peer,
+                CHANNEL_SERVER_PLAYERS_DATA,
+                false
             );
         }
     }
@@ -124,7 +151,7 @@ private:
     }
 
     void handle_packet(const ENetEvent& event) {
-        std::cout << "Got data from " << event.peer->address.host << ":" << event.peer->address.port << " - " << event.packet->data << std::endl;
+        if (DEBUG) std::cout << "Got data from " << event.peer->address.host << ":" << event.peer->address.port << " - " << event.packet->data << std::endl;
         const char* data = reinterpret_cast<const char*>(event.packet->data);
 
         if (event.channelID == CHANNEL_SERVER_PING) {

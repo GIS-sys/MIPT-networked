@@ -107,6 +107,7 @@ private:
     NetworkClient network_client;
     bool _is_connected_lobby = false;
     bool _is_connected_server = false;
+    float send_data_timer = 0;
 
 public:
     Game(int width, int height, const char* name, int fps) {
@@ -165,15 +166,17 @@ public:
         }
 
         // If connected to the server - try to pass my position
-        if (is_connected_server()) {
+        send_data_timer -= dt;
+        if (is_connected_server() && send_data_timer < 0) {
             send(prepare_for_send(me.to_string_vector({ .pos = true, .ping = true })), network_client.get_server_peer(), CHANNEL_SERVER_PLAYERS_DATA, true);
+            send_data_timer = CLIENT_SEND_DATA_INTERVAL_MS / 1000;
         }
 
         // Also update ping
         pinger.update(dt);
         if (is_connected_server() && pinger.need_ping()) {
-            send("ping", network_client.get_server_peer(), CHANNEL_SERVER_PING, false);
             pinger.sent();
+            send("ping", network_client.get_server_peer(), CHANNEL_SERVER_PING, false);
         }
     }
 
@@ -205,7 +208,6 @@ public:
             DrawText("List of players:", 20, 100, 20, WHITE);
             int i = 0;
             for (const auto& player_it : players) {
-                std::cout << player_it.second.id << " ";
                 render_player(player_it.second, 40, 140 + 20 * i);
                 ++i;
             }
@@ -254,7 +256,7 @@ public:
     }
 
     void handlePacket(const ENetEvent& event) {
-        std::cout << "Got data from ch=" << (int)event.channelID << " " << event.peer->address.host << ":" << event.peer->address.port << " - " << event.packet->data << std::endl;
+        if (DEBUG) std::cout << "Got data from ch=" << (int)event.channelID << " " << event.peer->address.host << ":" << event.peer->address.port << " - " << event.packet->data << std::endl;
 
         const char* msgData = reinterpret_cast<const char*>(event.packet->data);
 
@@ -266,7 +268,6 @@ public:
             std::vector<std::string> parsed = parse_from_receive(msg);
             std::string server_addr = parsed[0];
             int server_port = std::atoi(parsed[1].c_str());
-            std::cout << "Connecting to server: " << server_addr << ":" << server_port << std::endl;
             network_client.connect_to_server(server_addr.c_str(), server_port);
             return;
         }
@@ -290,11 +291,9 @@ public:
             std::vector<std::string> parsed = parse_from_receive(msg);
             PlayerUseData use{ .name = true, .id = true };
             players.clear();
-            std::cout << "!!!" << parsed.size() << " " << use.length() << std::endl;
             for (int i = 0; i < parsed.size(); i += use.length()) {
                 Player player = Player::from_string_vector(parsed, use, i);
                 players[player.id] = player;
-                std::cout << "@@@" << player.id << std::endl;
             }
             return;
         }

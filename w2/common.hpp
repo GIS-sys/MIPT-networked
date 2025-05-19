@@ -16,6 +16,7 @@ static const float PLAYER_SPEED = 100;
 static const float PLAYER_SIZE = 5;
 static const int CLIENT_SERVICE_TIMEOUT_MS = 10;
 static const int CLIENT_PING_INTERVAL_MS = 1000;
+static const float CLIENT_SEND_DATA_INTERVAL_MS = 10;
 
 
 // common
@@ -29,6 +30,7 @@ static const int CHANNELS_AMOUNT = 5;
 static const std::string LOBBY_ADDR = "localhost";
 static const int LOBBY_PORT = 10887;
 static const std::string NETWORK_MSG_DIVIDER = "|";
+static const bool DEBUG = false;  // for more stdout
 
 
 // non-client
@@ -37,6 +39,7 @@ static const int SERVER_PORT = 10888;
 static const int MAX_PLAYERS = 64;
 static const int LOBBY_SERVICE_TIMEOUT_MS = 100;
 static const int SERVER_SERVICE_TIMEOUT_MS = 10;
+static const float SERVER_SEND_DATA_INTERVAL_MS = 10;
 
 
 struct Vector2D {
@@ -137,7 +140,7 @@ std::string prepare_for_send(const std::vector<std::string>& strings) {
 
 void send(const std::string& msg, ENetPeer* peer, int channel, bool reliable) {
     if (!peer) return;
-    std::cout << "Sending data " << msg << std::endl;
+    if (DEBUG) std::cout << "Sending data " << msg << std::endl;
     ENetPacket* packet = enet_packet_create(msg.c_str(), msg.size() + 1, reliable ? ENET_PACKET_FLAG_RELIABLE : ENET_PACKET_FLAG_UNSEQUENCED);
     enet_peer_send(peer, channel, packet);
 }

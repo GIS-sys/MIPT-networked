@@ -94,7 +94,7 @@ private:
     }
 
     void handle_packet(const ENetEvent& event) {
-        std::cout << "Got data from " << event.peer->address.host << ":" << event.peer->address.port << " - " << event.packet->data << std::endl;
+        if (DEBUG) std::cout << "Got data from " << event.peer->address.host << ":" << event.peer->address.port << " - " << event.packet->data << std::endl;
         const char* data = reinterpret_cast<const char*>(event.packet->data);
 
         if (data == SYSCMD_START) {
