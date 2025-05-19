@@ -81,11 +81,54 @@ struct ClientState {
 };
 
 
+struct MathDuel {
+protected:
+    std::vector<ClientState> _participants;
+    std::string _question;
+    std::string _answer;
+
+public:
+    MathDuel() = default;
+    MathDuel(ClientState participant) { add_opponent(participant); }
+
+    const std::vector<ClientState>& participants() const { return _participants; }
+    const std::string& question() const { return _question; }
+    const std::string& answer() const { return _answer; }
+
+    bool is_participant(const ClientState& clientstate) const {
+        for (const ClientState& participant : _participants) {
+            if (clientstate.id == participant.id) return true;
+        }
+        return false;
+    }
+
+    void add_opponent(ClientState participant) {
+        _participants.push_back(participant);
+        if (_participants.size() == 2) {
+            _question = "TODO";
+            _answer = "TODO";
+        }
+    }
+
+    bool is_waiting_for_opponent() const { return _participants.size() < 2; }
+
+    bool check(const std::string& attempt) const { return _answer == attempt; }
+
+    ClientState other(const ClientState& clientstate) const {
+        for (const ClientState& participant : _participants) {
+            if (clientstate.id != participant.id) return participant;
+        }
+        return clientstate;
+    }
+};
+
+
 class StateMachine {
 protected:
     Server& server;
 
     std::map<std::pair<int, std::string>, ClientState> clients;
+    std::vector<MathDuel> math_duels;
 
 public:
     StateMachine(Server& server) : server(server) {}
@@ -146,14 +189,59 @@ public:
 
         // Process math duel
         if (result.starts(SYSMSG_MATHDUEL_INIT)) {
-            std::string msg = result.get_sys_msg(SYSMSG_MATHDUEL_INIT);
-            server.send("TODO Process math init " + msg, result.responder_sockaddr);
-        } else if (result.starts(SYSMSG_MATHDUEL_ANS)) {
-            std::string msg = result.get_sys_msg(SYSMSG_MATHDUEL_ANS);
-            server.send("TODO Process math ans " + msg, result.responder_sockaddr);
-        } else {
-            server.send("Please use one of the commands as prefix to your message", result.responder_sockaddr);
+            // Disallow to participate in several math duels
+            for (const MathDuel& math_duel : math_duels) {
+                if (math_duel.is_participant(client)) {
+                    if (math_duel.is_waiting_for_opponent()) {
+                        server.send("You are already waiting for a math duel!", client.my_sockaddr);
+                    } else {
+                        server.send("You are already participating in a math duel! Reminder: " + math_duel.question(), client.my_sockaddr);
+                    }
+                    return;
+                }
+            }
+            // Check if last duel is waiting for an opponent
+            if (!math_duels.empty() && math_duels.back().is_waiting_for_opponent()) {
+                math_duels.back().add_opponent(client);
+                for (const ClientState& duelist : math_duels.back().participants()) {
+                    server.send("A math duel has begun! Send answer to this question: " + math_duels.back().question(), duelist.my_sockaddr);
+                }
+                return;
+            }
+            // Else create a new duel
+            math_duels.push_back(MathDuel(client));
+            server.send("You have registered for a math duel. Waiting for an opponent...", client.my_sockaddr);
+            return;
         }
+        if (result.starts(SYSMSG_MATHDUEL_ANS)) {
+            std::string msg = result.get_sys_msg(SYSMSG_MATHDUEL_ANS);
+            trim(msg);
+            // Find math duel
+            int math_duel_index = -1;
+            for (int i = 0; i < math_duels.size(); ++i) {
+                if (math_duels[i].is_participant(client)) {
+                    math_duel_index = i;
+                    break;
+                }
+            }
+            // If not participating
+            if (math_duel_index == -1) {
+                server.send("You are not taking part in a math duel! Register for it using command " + SYSMSG_MATHDUEL_INIT, client.my_sockaddr);
+                return;
+            }
+            // Else check answer
+            if (math_duels[math_duel_index].check(msg)) {
+                server.send("Congratulations, you won the mathduel!", client.my_sockaddr);
+                server.send("Unfortunately, you lost the mathduel :(", math_duels[math_duel_index].other(client).my_sockaddr);
+                math_duels.erase(math_duels.begin() + math_duel_index); // probably need to rewrite using list, but oh well, let's assume not many ppl want to do math
+            } else {
+                server.send("Wrong answer, try again. Reminder: " + math_duels[math_duel_index].question(), client.my_sockaddr);
+            }
+            return;
+        }
+
+        // Unexpected message
+        server.send("Please use one of the commands as prefix to your message", client.my_sockaddr);
     }
 };
 
