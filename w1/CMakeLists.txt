@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(SHARED_SOURCES 
     socket_tools.cpp
+    common.cpp
 )
 
 add_executable(server

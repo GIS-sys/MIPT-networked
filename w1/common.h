@@ -3,6 +3,7 @@
 #include <arpa/inet.h>
 #include <cstring>
 #include <iostream>
+#include <netinet/in.h>
 #include <string>
 
 
@@ -20,6 +21,12 @@ struct ReadResult {
     sockaddr_in responder_sockaddr;
     bool is_error = false;
     bool is_empty = true;
+
+    static char* calc_responder_addr(const sockaddr_in& some_sockaddr) { return inet_ntoa(some_sockaddr.sin_addr); };
+    static int calc_responder_port(const sockaddr_in& some_sockaddr) { return ntohs(some_sockaddr.sin_port); };
+
+    char* get_responder_addr() const { return calc_responder_addr(responder_sockaddr); };
+    int get_responder_port() const { return calc_responder_port(responder_sockaddr); };
 };
 
 

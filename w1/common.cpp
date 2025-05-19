@@ -1,8 +1,11 @@
 #include "common.h"
+#include <netinet/in.h>
 
 
 ssize_t CommonCS::_send(const std::string& msg, int sfd, sockaddr_in client_sockaddr) const {
-    std::cout << "(sending message: " << msg << ")" << std::endl;
+    std::cout << "(sending message to "
+              << ReadResult::calc_responder_addr(client_sockaddr) << ":" << ReadResult::calc_responder_port(client_sockaddr) << ": "
+              << msg << ")" << std::endl;
     ssize_t res = sendto(sfd, msg.c_str(), msg.size(), 0, (sockaddr*)&client_sockaddr, sizeof(client_sockaddr));
     if (res == -1) std::cout << "(error while sending message: " << strerror(errno) << ")" << std::endl;
     return res;
@@ -32,16 +35,17 @@ ReadResult CommonCS::_read(int sfd) const {
 
     // Read message
     char buffer[MESSAGE_BUFFER_SIZE];
-    sockaddr_in responderAddr;
-    socklen_t addrLen = sizeof(responderAddr);
-    ssize_t numBytes = recvfrom(sfd, buffer, sizeof(buffer), 0, (sockaddr*)&responderAddr, &addrLen);
+    sockaddr_in responder_sockaddr;
+    socklen_t addrLen = sizeof(responder_sockaddr);
+    ssize_t numBytes = recvfrom(sfd, buffer, sizeof(buffer), 0, (sockaddr*)&responder_sockaddr, &addrLen);
 
     if (numBytes > 0) {
         buffer[numBytes] = '\0';
     }
-    char* responder_addr = inet_ntoa(responderAddr.sin_addr);
-    int responder_port = ntohs(responderAddr.sin_port);
-    std::cout << "(got message from client " << responder_addr << ":" << responder_port << ": " << buffer << ")" << std::endl;
-    return ReadResult{ .msg = buffer, .responder_sockaddr = responderAddr, .is_error = false, .is_empty = false };
+    ReadResult result{ .msg = buffer, .responder_sockaddr = responder_sockaddr, .is_error = false, .is_empty = false };
+    std::cout << "(got message from "
+              << result.get_responder_addr() << ":" << result.get_responder_port() << ": "
+              << buffer << ")" << std::endl;
+    return result;
 }
 

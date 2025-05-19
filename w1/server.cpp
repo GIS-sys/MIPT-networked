@@ -69,6 +69,21 @@ ReadResult Server::read() const {
 }
 
 
+class StateMachine {
+protected:
+    Server& server;
+
+public:
+    StateMachine(Server& server) : server(server) {}
+
+    void process(const ReadResult& result) {
+        std::string response;
+        response = "pong to " + std::to_string(result.get_responder_port());
+        server.send(response, result.responder_sockaddr);
+    }
+};
+
+
 int main() {
     Server server(SERVER_PORT);
 
@@ -78,13 +93,16 @@ int main() {
         return 1;
     }
 
+    // Start state machine
+    StateMachine state_machine(server);
+
     // Start thread for reading user input and sending it to the server
     std::thread thread_server_listen([&]() {
         while (true) {
             sleep(SERVER_SLEEP_BETWEEN_RECEIVE);
             ReadResult result = server.read();
             if (result.is_empty) continue;
-            server.send("pong", result.responder_sockaddr);
+            state_machine.process(result);
         }
     });
 
