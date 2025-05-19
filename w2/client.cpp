@@ -15,8 +15,9 @@ static const int FPS = 60;
 static const float PLAYER_SPEED = 100;
 static const float PLAYER_SIZE = 5;
 static const char* LOBBY_ADDR = "localhost";
-static const float LOBBY_PORT = 10887;
+static const int LOBBY_PORT = 10887;
 static const int CLIENT_SERVICE_TIMEOUT_MS = 10;
+static const std::string SYSCMD_START = "START";
 
 
 struct Vector2D {
@@ -73,6 +74,10 @@ private:
     ENetPeer* server_peer = nullptr;
 
 public:
+    ENetPeer* get_lobby_peer() const { return lobby_peer; }
+
+    ENetPeer* get_server_peer() const { return server_peer; }
+
     NetworkClient() {
         if (enet_initialize() != 0) {
             throw std::runtime_error("Cannot init ENet");
@@ -91,7 +96,7 @@ public:
         }
     }
 
-    bool connectToLobby(const char* address, int port) {
+    bool connect_to_lobby(const char* address, int port) {
         ENetAddress enetAddr;
         enet_address_set_host(&enetAddr, address);
         enetAddr.port = port;
@@ -103,7 +108,7 @@ public:
         return true;
     }
 
-    bool connectToServer(const NetworkAddress& address) {
+    bool connect_to_server(const NetworkAddress& address) {
         ENetAddress enetAddr;
         enetAddr.host = address.host;
         enetAddr.port = address.port;
@@ -119,6 +124,13 @@ public:
         ENetEvent event;
         enet_host_service(client_host, &event, timeout);
         return event;
+    }
+
+    void send(const std::string& msg, ENetPeer* peer, bool reliable) {
+        if (!peer) return;
+
+        ENetPacket* packet = enet_packet_create(msg.c_str(), msg.size() + 1, reliable ? ENET_PACKET_FLAG_RELIABLE : ENET_PACKET_FLAG_UNSEQUENCED);
+        enet_peer_send(peer, 0, packet);
     }
 };
 
@@ -153,7 +165,7 @@ public:
         me.pos.y = rand() % height;
 
         // Connect to lobby
-        if (!network_client.connectToLobby(LOBBY_ADDR, LOBBY_PORT)) {
+        if (!network_client.connect_to_lobby(LOBBY_ADDR, LOBBY_PORT)) {
             throw std::runtime_error("Cannot connect to lobby");
         }
     }
@@ -171,6 +183,7 @@ public:
         bool right = IsKeyDown(KEY_RIGHT);
         bool up = IsKeyDown(KEY_UP);
         bool down = IsKeyDown(KEY_DOWN);
+        bool enter = IsKeyDown(KEY_ENTER);
 
         // Calculate speed based on pressed buttons
         Vector2D speed;
@@ -180,6 +193,17 @@ public:
         if (down) speed.y += 1;
         speed = speed.normalize() * PLAYER_SPEED;
         me.pos = me.pos + speed * dt;
+
+        // If enter is pressed, and not yet connected to the game server - send request to lobby
+        if (enter && !is_connected_server()) {
+            network_client.send(SYSCMD_START, network_client.get_lobby_peer(), true);
+        }
+
+        // If connected to the server - try to pass my position
+        // TODO
+
+        // Also update ping
+        // pinger.update(dt); // TODO
     }
 
     void render_player(const Player& player, int x, int y) const {
@@ -266,10 +290,6 @@ public:
 };
 
 
-//ENetPacket *packet = enet_packet_create(hugeMessage, sendSize, ENET_PACKET_FLAG_RELIABLE);
-//ENetPacket *packet = enet_packet_create(msg, strlen(msg) + 1, ENET_PACKET_FLAG_UNSEQUENCED);
-
-
 int main(int argc, const char **argv)
 {
     std::string player_name;
@@ -280,6 +300,7 @@ int main(int argc, const char **argv)
         player_name = "Player" + std::to_string(rand());
     }
     std::cout << "Starting game as " << player_name << std::endl;
+
     Game game(WIDTH, HEIGHT, NAME, FPS, player_name);
     game.run();
 
