@@ -10,12 +10,6 @@
 #include "common.hpp"
 
 
-// //        player_name = "Player" + std::to_string(rand());
-struct Player {
-    ENetPeer* peer;
-};
-
-
 struct GameSession {
     std::vector<Player> players;
     bool active = false;
@@ -38,7 +32,7 @@ public:
         enet_address_set_host(&address, SERVER_ADDR.c_str());
         address.port = SERVER_PORT;
 
-        game_host = enet_host_create(&address, MAX_PLAYERS, 2, 0, 0);
+        game_host = enet_host_create(&address, MAX_PLAYERS, CHANNELS_AMOUNT, 0, 0);
         if (!game_host) {
             throw std::runtime_error("Cannot create game host");
         }
@@ -81,7 +75,15 @@ public:
 
 private:
     void handle_connect(const ENetEvent& event) {
-        current_session.players.push_back(Player(event.peer));
+        Player player(event.peer);
+        player.generate_random_credentials();
+        current_session.players.push_back(player);
+        send(
+            prepare_for_send(player.to_string_vector()),
+            player.peer,
+            CHANNEL_SERVER_PLAYER_CRED,
+            true
+        );
     }
 
     void handle_disconnect(const ENetEvent& event) {

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <enet/enet.h>
+#include <iostream>
+#include <math.h>
 #include <string>
 #include <vector>
 
@@ -12,6 +15,7 @@ static const int FPS = 60;
 static const float PLAYER_SPEED = 100;
 static const float PLAYER_SIZE = 5;
 static const int CLIENT_SERVICE_TIMEOUT_MS = 10;
+static const int CLIENT_PING_INTERVAL_MS = 1000;
 
 
 // common
@@ -21,9 +25,9 @@ static const int CHANNEL_SERVER_PING = 1;
 static const int CHANNEL_SERVER_PLAYER_LIST = 2;
 static const int CHANNEL_SERVER_PLAYER_CRED = 3;
 static const int CHANNEL_SERVER_PLAYER_DATA = 4;
+static const int CHANNELS_AMOUNT = 5;
 static const std::string LOBBY_ADDR = "localhost";
 static const int LOBBY_PORT = 10887;
-
 static const std::string NETWORK_MSG_DIVIDER = "|";
 
 
@@ -33,6 +37,64 @@ static const int SERVER_PORT = 10888;
 static const int MAX_PLAYERS = 64;
 static const int LOBBY_SERVICE_TIMEOUT_MS = 100;
 static const int SERVER_SERVICE_TIMEOUT_MS = 10;
+
+
+struct Vector2D {
+    float x;
+    float y;
+
+    Vector2D() : x(0), y(0) {}
+    Vector2D(float x, float y) : x(x), y(y) {}
+    Vector2D(std::pair<float, float> pos) : Vector2D(pos.first, pos.second) {}
+
+    Vector2D operator*(float k) const { return { x * k, y * k }; }
+    Vector2D operator/(float k) const { return *this * (1 / k); }
+    Vector2D operator+(const Vector2D& oth) const { return { x + oth.x, y + oth.y }; }
+
+    float norm() const { return x * x + y * y; }
+    float length() const { return std::sqrt(norm()); }
+    Vector2D normalize() const {
+        if (x == 0 && y == 0) return Vector2D();
+        return *this / length();
+    }
+};
+
+Vector2D operator*(float k, const Vector2D& vec) { return vec * k; }
+Vector2D operator/(float k, const Vector2D& vec) { return vec / k; }
+
+
+struct Player {
+    ENetPeer* peer;
+
+    // Constant data
+    std::string name;
+    int id = -1;
+    // Pass between servers dynamically
+    Vector2D pos;
+    int ping = -1;
+
+    Player(ENetPeer* peer = nullptr, const std::string& name = "", int id = -1, Vector2D pos = {}, int ping = -1)
+        : peer(peer), name(name), id(id), pos(pos), ping(ping) {}
+
+    std::vector<std::string> to_string_vector() const {
+        return {name, std::to_string(id), std::to_string(pos.x), std::to_string(pos.y), std::to_string(ping)};
+    }
+
+    static Player from_string_vector(const std::vector<std::string>& strings) {
+        Player player;
+        player.name = strings[0];
+        player.id = std::atoi(strings[1].c_str());
+        player.pos.x = std::atoi(strings[2].c_str());
+        player.pos.y = std::atoi(strings[3].c_str());
+        player.ping = std::atoi(strings[4].c_str());
+        return player;
+    }
+
+    void generate_random_credentials() {
+        id = rand();
+        name = "Player" + std::to_string(id);
+    }
+};
 
 
 std::string prepare_for_send(const std::vector<std::string>& strings) {
@@ -53,4 +115,11 @@ std::string prepare_for_send(const std::vector<std::string>& strings) {
         strings.push_back(string);
     }
     return strings;
+}
+
+void send(const std::string& msg, ENetPeer* peer, int channel, bool reliable) {
+    if (!peer) return;
+    std::cout << "Sending data " << msg << std::endl;
+    ENetPacket* packet = enet_packet_create(msg.c_str(), msg.size() + 1, reliable ? ENET_PACKET_FLAG_RELIABLE : ENET_PACKET_FLAG_UNSEQUENCED);
+    enet_peer_send(peer, channel, packet);
 }

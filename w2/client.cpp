@@ -7,53 +7,9 @@
 
 #include "raylib.h"
 #include "common.hpp"
-
-
-struct Vector2D {
-    float x;
-    float y;
-
-    Vector2D() : x(0), y(0) {}
-    Vector2D(float x, float y) : x(x), y(y) {}
-    Vector2D(std::pair<float, float> pos) : Vector2D(pos.first, pos.second) {}
-
-    Vector2D operator*(float k) const { return { x * k, y * k }; }
-    Vector2D operator/(float k) const { return *this * (1 / k); }
-    Vector2D operator+(const Vector2D& oth) const { return { x + oth.x, y + oth.y }; }
-
-    float norm() const { return x * x + y * y; }
-    float length() const { return std::sqrt(norm()); }
-    Vector2D normalize() const {
-        if (x == 0 && y == 0) return Vector2D();
-        return *this / length();
-    }
-
-    operator Vector2() const { return { x, y }; }
-};
-
-Vector2D operator*(float k, const Vector2D& vec) { return vec * k; }
-Vector2D operator/(float k, const Vector2D& vec) { return vec / k; }
-
-
-struct Player {
-    // Constant data
-    std::string name;
-    int id = -1;
-    // Pass between servers dynamically
-    Vector2D pos;
-    int ping = -1;
-
-    Player(const std::string& name = "", int id = -1, Vector2D pos = {}, int ping = -1)
-        : name(name), id(id), pos(pos), ping(ping) {}
-};
-
-
-// struct NetworkAddress {
-//     uint32_t host;
-//     uint16_t port;
-// 
-//     NetworkAddress(uint32_t h = 0, uint16_t p = 0) : host(h), port(p) {}
-// };
+Vector2 to_vector2(const Vector2D& vec) {
+    return { vec.x, vec.y };
+}
 
 
 class NetworkClient {
@@ -73,7 +29,7 @@ public:
         }
         atexit(enet_deinitialize);
 
-        client_host = enet_host_create(nullptr, 2, 3, 0, 0);
+        client_host = enet_host_create(nullptr, 2, CHANNELS_AMOUNT, 0, 0);
         if (!client_host) {
             throw std::runtime_error("Cannot create client host");
         }
@@ -90,7 +46,7 @@ public:
         enet_address_set_host(&enetAddr, address);
         enetAddr.port = port;
 
-        lobby_peer = enet_host_connect(client_host, &enetAddr, 1, 0);
+        lobby_peer = enet_host_connect(client_host, &enetAddr, CHANNELS_AMOUNT, 0);
         if (!lobby_peer) {
             return false;
         }
@@ -102,7 +58,7 @@ public:
         enet_address_set_host(&enetAddr, address);
         enetAddr.port = port;
 
-        server_peer = enet_host_connect(client_host, &enetAddr, 3, 0);
+        server_peer = enet_host_connect(client_host, &enetAddr, CHANNELS_AMOUNT, 0);
         if (!lobby_peer) {
             return false;
         }
@@ -114,12 +70,31 @@ public:
         enet_host_service(client_host, &event, timeout);
         return event;
     }
+};
 
-    void send(const std::string& msg, ENetPeer* peer, int channel, bool reliable) {
-        if (!peer) return;
 
-        ENetPacket* packet = enet_packet_create(msg.c_str(), msg.size() + 1, reliable ? ENET_PACKET_FLAG_RELIABLE : ENET_PACKET_FLAG_UNSEQUENCED);
-        enet_peer_send(peer, channel, packet);
+
+class Pinger {
+private:
+    float since_last_sent = 0;
+    float _ping = 0;
+public:
+    void update(float dt) {
+        since_last_sent += dt;
+    }
+
+    float ping() const { return _ping; }
+
+    bool need_ping() {
+        return since_last_sent * 1000 > CLIENT_PING_INTERVAL_MS;
+    }
+
+    void sent() {
+        since_last_sent = 0;
+    }
+
+    void got() {
+        _ping = since_last_sent / 2;
     }
 };
 
@@ -128,6 +103,7 @@ class Game {
 private:
     std::map<int, Player> players;
     Player me;
+    Pinger pinger;
     NetworkClient network_client;
     bool _is_connected_lobby = false;
     bool _is_connected_server = false;
@@ -185,19 +161,25 @@ public:
 
         // If enter is pressed, and not yet connected to the game server - send request to lobby
         if (enter && !is_connected_server()) {
-            network_client.send(SYSCMD_START, network_client.get_lobby_peer(), CHANNEL_LOBBY_START, true);
+            send(SYSCMD_START, network_client.get_lobby_peer(), CHANNEL_LOBBY_START, true);
         }
 
         // If connected to the server - try to pass my position
-        // TODO
+        if (is_connected_server()) {
+            send(prepare_for_send(me.to_string_vector()), network_client.get_server_peer(), CHANNEL_SERVER_PLAYER_DATA, true);
+        }
 
         // Also update ping
-        // pinger.update(dt); // TODO
+        pinger.update(dt);
+        if (is_connected_server() && pinger.need_ping()) {
+            send("ping", network_client.get_server_peer(), CHANNEL_SERVER_PING, false);
+            pinger.sent();
+        }
     }
 
     void render_player(const Player& player, int x, int y) const {
         DrawText(("ID: " + std::to_string(me.id) + " Name: " + me.name + " Ping: " + std::to_string(me.ping)).c_str(), x, y, 20, WHITE);
-        DrawCircleV(player.pos, PLAYER_SIZE, WHITE);
+        DrawCircleV(to_vector2(player.pos), PLAYER_SIZE, WHITE);
     }
 
     void render() const {
@@ -287,14 +269,20 @@ public:
             network_client.connect_to_server(server_addr.c_str(), server_port);
             return;
         }
-        // TODO
         if (event.channelID == CHANNEL_SERVER_PLAYER_CRED) {
             // Parse player data
             std::string msg(msgData);
             std::vector<std::string> parsed = parse_from_receive(msg);
-            me.name = parsed[0];
-            me.id = std::atoi(parsed[1].c_str());
+            Player player_data = Player::from_string_vector(parsed);
+            me.id = player_data.id;
+            me.name = player_data.name;
+            std::cout << "Got new credentials: name=" << me.name << " id=" << me.id << std::endl;
             return;
+        }
+        // TODO
+        if (event.channelID == CHANNEL_SERVER_PING) {
+            pinger.got();
+            me.ping = pinger.ping();
         }
     }
 };

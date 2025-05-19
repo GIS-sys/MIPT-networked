@@ -10,11 +10,6 @@
 #include "common.hpp"
 
 
-struct Player {
-    ENetPeer* peer;
-};
-
-
 struct GameSession {
     std::vector<Player> players;
     bool active = false;
@@ -37,7 +32,7 @@ public:
         enet_address_set_host(&address, LOBBY_ADDR.c_str());
         address.port = LOBBY_PORT;
 
-        lobby_host = enet_host_create(&address, MAX_PLAYERS, 2, 0, 0);
+        lobby_host = enet_host_create(&address, MAX_PLAYERS, CHANNELS_AMOUNT, 0, 0);
         if (!lobby_host) {
             throw std::runtime_error("Cannot create lobby host");
         }
