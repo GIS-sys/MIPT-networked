@@ -14,6 +14,11 @@ static const int SERVER_PORT = 10888;
 static const int MAX_PLAYERS = 64;
 static const int LOBNY_SERVICE_TIMEOUT_MS = 100;
 static const std::string SYSCMD_START = "START";
+static const int CHANNEL_LOBBY_START = 0;
+static const int CHANNEL_SERVER_PING = 1;
+static const int CHANNEL_SERVER_PLAYER_LIST = 2;
+static const int CHANNEL_SERVER_PLAYER_CRED = 3;
+static const int CHANNEL_SERVER_PLAYER_DATA = 4;
 
 
 struct Player {
@@ -133,7 +138,7 @@ private:
     void send_game_server_info(ENetPeer* peer) {
         std::string message = SERVER_ADDR + std::to_string(SERVER_PORT);
         ENetPacket* packet = enet_packet_create(message.c_str(), message.size() + 1, ENET_PACKET_FLAG_RELIABLE);
-        enet_peer_send(peer, 0, packet);
+        enet_peer_send(peer, CHANNEL_LOBBY_START, packet);
 
         std::cout << "Sent game server info to " << peer->address.host << ":" << peer->address.port << std::endl;
     }

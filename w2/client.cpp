@@ -18,6 +18,11 @@ static const char* LOBBY_ADDR = "localhost";
 static const int LOBBY_PORT = 10887;
 static const int CLIENT_SERVICE_TIMEOUT_MS = 10;
 static const std::string SYSCMD_START = "START";
+static const int CHANNEL_LOBBY_START = 0;
+static const int CHANNEL_SERVER_PING = 1;
+static const int CHANNEL_SERVER_PLAYER_LIST = 2;
+static const int CHANNEL_SERVER_PLAYER_CRED = 3;
+static const int CHANNEL_SERVER_PLAYER_DATA = 4;
 
 
 struct Vector2D {
@@ -126,11 +131,11 @@ public:
         return event;
     }
 
-    void send(const std::string& msg, ENetPeer* peer, bool reliable) {
+    void send(const std::string& msg, ENetPeer* peer, int channel, bool reliable) {
         if (!peer) return;
 
         ENetPacket* packet = enet_packet_create(msg.c_str(), msg.size() + 1, reliable ? ENET_PACKET_FLAG_RELIABLE : ENET_PACKET_FLAG_UNSEQUENCED);
-        enet_peer_send(peer, 0, packet);
+        enet_peer_send(peer, channel, packet);
     }
 };
 
@@ -196,7 +201,7 @@ public:
 
         // If enter is pressed, and not yet connected to the game server - send request to lobby
         if (enter && !is_connected_server()) {
-            network_client.send(SYSCMD_START, network_client.get_lobby_peer(), true);
+            network_client.send(SYSCMD_START, network_client.get_lobby_peer(), CHANNEL_LOBBY_START, true);
         }
 
         // If connected to the server - try to pass my position
