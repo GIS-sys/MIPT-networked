@@ -1,10 +1,12 @@
 #include <arpa/inet.h>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <fcntl.h>
 #include <iostream>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <random>
 #include <string>
 #include <sys/select.h>
 #include <sys/socket.h>
@@ -16,29 +18,33 @@
 
 class Client {
 protected:
-    bool connected = false;
-
     sockaddr_in serverSockAddr;
-    int sfd;
+    int sfd = -1;
+
+    bool connected = false;
+    std::string id;
 
 public:
     Client() {
+        id = std::to_string(std::rand());
         reset();
     }
 
-    bool is_connected() const;
+    bool is_connected() const {
+        return connected;
+    }
 
     bool connect(const std::string& server_name, int port);
     void start_listening();
     void start_reading();
 
-    void reset();
+    void reset() {
+        connected = false;
+        serverSockAddr = {};
+        if (sfd != -1) close(sfd);
+        sfd = -1;
+    }
 };
-
-
-bool Client::is_connected() const {
-    return connected;
-}
 
 bool Client::connect(const std::string& server_name, int port) {
     std::string port_str = std::to_string(port);
@@ -73,7 +79,9 @@ void Client::start_listening() {
 }
 
 void Client::start_reading() {
-    const char *pingMsg = "ping";
+    std::string pingMsgStr = "ping";
+    pingMsgStr += id;
+    const char *pingMsg = pingMsgStr.c_str();
     printf("Sending 'ping' to server...\n");
     sendto(sfd, pingMsg, strlen(pingMsg), 0, (sockaddr*)&serverSockAddr, sizeof(serverSockAddr));
 
@@ -91,6 +99,7 @@ void Client::start_reading() {
         } else if (ready == 0) {
             // Timeout: resend ping
             printf("No response, resending 'ping'...\n");
+            std::cout << pingMsgStr << std::endl;
             sendto(sfd, pingMsg, strlen(pingMsg), 0, (sockaddr*)&serverSockAddr, sizeof(serverSockAddr));
         } else {
             char buffer[1024];
@@ -101,6 +110,7 @@ void Client::start_reading() {
             if (numBytes > 0) {
                 buffer[numBytes] = '\0';
                 printf("Received '%s' from server. Sending 'ping' again...\n", buffer);
+                std::cout << pingMsgStr << std::endl;
                 sleep(1);
                 sendto(sfd, pingMsg, strlen(pingMsg), 0, (sockaddr*)&responderAddr, addrLen);
             }
@@ -108,15 +118,10 @@ void Client::start_reading() {
     }
 }
 
-void Client::reset() {
-    connected = false;
-    serverSockAddr = {};
-    if (sfd != -1) close(sfd);
-    sfd = -1;
-}
 
 
 int main() {
+    std::srand(std::time({}));
     Client client;
 
     client.connect("localhost", 2025);
