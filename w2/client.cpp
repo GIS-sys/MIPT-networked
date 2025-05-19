@@ -15,8 +15,8 @@ static const int FPS = 60;
 static const float PLAYER_SPEED = 100;
 static const float PLAYER_SIZE = 5;
 static const char* LOBBY_ADDR = "localhost";
-static const float LOBBY_PORT = 2025;
-static const int LOBBY_RECONNECT_TIMEOUT = 1;
+static const float LOBBY_PORT = 10887;
+static const int CLIENT_SERVICE_TIMEOUT_MS = 10;
 
 
 struct Vector2D {
@@ -58,9 +58,6 @@ struct Player {
 };
 
 
-
-
-
 struct NetworkAddress {
     uint32_t host;
     uint16_t port;
@@ -75,13 +72,7 @@ private:
     ENetPeer* lobby_peer = nullptr;
     ENetPeer* server_peer = nullptr;
 
-    bool _is_connected_lobby = false;
-    bool _is_connected_server = false;
-
 public:
-    bool is_connected_lobby() const { return _is_connected_lobby; }
-    bool is_connected_server() const { return _is_connected_server; }
-
     NetworkClient() {
         if (enet_initialize() != 0) {
             throw std::runtime_error("Cannot init ENet");
@@ -123,10 +114,13 @@ public:
         }
         return true;
     }
+
+    ENetEvent service(int timeout = CLIENT_SERVICE_TIMEOUT_MS) {
+        ENetEvent event;
+        enet_host_service(client_host, &event, timeout);
+        return event;
+    }
 };
-
-
-
 
 
 class Game {
@@ -134,6 +128,8 @@ private:
     std::map<int, Player> players;
     Player me;
     NetworkClient network_client;
+    bool _is_connected_lobby = false;
+    bool _is_connected_server = false;
 
 public:
     Game(int width, int height, const char* name, int fps, const std::string& player_name) : me(player_name) {
@@ -157,14 +153,13 @@ public:
         me.pos.y = rand() % height;
 
         // Connect to lobby
-        while (!network_client.connectToLobby(LOBBY_ADDR, LOBBY_PORT)) {
-            std::cout << "Failed to connect to lobby; retrying in " << LOBBY_RECONNECT_TIMEOUT << "seconds" << std::endl;
-            sleep(LOBBY_RECONNECT_TIMEOUT);
+        if (!network_client.connectToLobby(LOBBY_ADDR, LOBBY_PORT)) {
+            throw std::runtime_error("Cannot connect to lobby");
         }
     }
 
-    bool is_connected_lobby() const { return network_client.is_connected_lobby(); }
-    bool is_connected_server() const { return network_client.is_connected_server(); }
+    bool is_connected_lobby() const { return _is_connected_lobby; }
+    bool is_connected_server() const { return _is_connected_server; }
 
     ~Game() {
         CloseWindow();
@@ -226,9 +221,47 @@ public:
         while (!WindowShouldClose()) {
             const float dt = GetFrameTime();
 
+            ENetEvent event = network_client.service();
+            handleNetworkEvent(event);
+
             update(dt);
             render();
         }
+    }
+
+    void handleNetworkEvent(const ENetEvent& event) {
+        switch (event.type) {
+            case ENET_EVENT_TYPE_NONE:
+                break;
+
+            case ENET_EVENT_TYPE_CONNECT:
+                std::cout << "Connected: " << event.peer->address.host << ":" << event.peer->address.port << std::endl;
+                if (!_is_connected_lobby) _is_connected_lobby = true;
+                else _is_connected_server = true;
+                break;
+
+            case ENET_EVENT_TYPE_DISCONNECT:
+                std::cout << "Disconnected: " << event.peer->address.host << ":" << event.peer->address.port << std::endl;
+                event.peer->data = nullptr;
+                CloseWindow();
+                break;
+
+            case ENET_EVENT_TYPE_RECEIVE:
+                handlePacket(event);
+                enet_packet_destroy(event.packet);
+                break;
+
+            default:
+                std::cout << "WTF is that?" << std::endl;
+                break;
+        }
+    }
+
+    void handlePacket(const ENetEvent& event) {
+        std::cout << "Got data from " << event.peer->address.host << ":" << event.peer->address.port << " - " << event.packet->data << std::endl;
+
+        const char* msgData = reinterpret_cast<const char*>(event.packet->data);
+        // TODO
     }
 };
 
