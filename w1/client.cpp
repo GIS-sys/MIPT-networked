@@ -24,6 +24,13 @@ const int CLIENT_RECEIVE_TIMEOUT = 1;
 const int MESSAGE_BUFFER_SIZE = 1024;
 
 
+struct ReadResult {
+    std::string msg;
+    bool is_error = false;
+    bool is_empty = true;
+};
+
+
 class Client {
 protected:
     sockaddr_in serverSockAddr;
@@ -51,7 +58,7 @@ public:
 
     bool connect(const std::string& server_name, int port);
     ssize_t send(const std::string& msg) const;
-    std::string read() const;
+    ReadResult read() const;
 };
 
 bool Client::connect(const std::string& server_name, int port) {
@@ -95,7 +102,7 @@ ssize_t Client::send(const std::string& msg) const {
     return res;
 }
 
-std::string Client::read() const {
+ReadResult Client::read() const {
     // fd_set containing only sfd
     fd_set readFds;
     FD_ZERO(&readFds);
@@ -110,11 +117,11 @@ std::string Client::read() const {
     // Process edge cases
     if (ready < 0) {
         // perror("select error");
-        return "";
+        return ReadResult{ .is_error = true, .is_empty = true };
     }
     if (ready == 0) {
         // std::cout << "no response from server?" << std::endl;
-        return "";
+        return ReadResult{ .is_error = false, .is_empty = true };
     }
 
     // Read message
@@ -127,7 +134,7 @@ std::string Client::read() const {
         buffer[numBytes] = '\0';
     }
     std::cout << "(got message from server: " << buffer << ")" << std::endl;
-    return buffer;
+    return ReadResult{ .msg = buffer, .is_error = false, .is_empty = false };
 }
 
 
@@ -154,8 +161,8 @@ int main() {
     std::thread thread_client_listen([&]() {
         while (true) {
             sleep(CLIENT_SLEEP_BETWEEN_RECEIVE);
-            std::string msg = client.read();
-            if (msg.empty()) continue;
+            ReadResult result = client.read();
+            if (result.is_empty) continue;
         }
     });
 
