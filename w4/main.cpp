@@ -2,6 +2,7 @@
 #include <algorithm> // min/max
 #include "raylib.h"
 #include <enet/enet.h>
+#include <stdio.h>
 
 #include <vector>
 #include "entity.h"

@@ -4,6 +4,7 @@
 #include "protocol.h"
 #include <stdlib.h>
 #include <vector>
+#include <math.h>
 #include <map>
 
 static std::vector<Entity> entities;
