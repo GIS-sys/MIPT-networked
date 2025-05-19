@@ -17,6 +17,13 @@
 #include "socket_tools.h"
 
 
+const char* SERVER_ADDR = "localhost";
+const int SERVER_PORT = 2025;
+const int CLIENT_SLEEP_BETWEEN_RECEIVE = 1;
+const int CLIENT_RECEIVE_TIMEOUT = 1;
+const int MESSAGE_BUFFER_SIZE = 1024;
+
+
 class Client {
 protected:
     sockaddr_in serverSockAddr;
@@ -89,13 +96,18 @@ ssize_t Client::send(const std::string& msg) const {
 }
 
 std::string Client::read() const {
+    // fd_set containing only sfd
     fd_set readFds;
     FD_ZERO(&readFds);
     FD_SET(sfd, &readFds);
 
-    timeval tv = {1, 0}; // 1 second timeout
+    // Timeout
+    timeval tv = {CLIENT_RECEIVE_TIMEOUT, 0};
+
+    // See if there are updates for any fd <= sfd
     int ready = select(sfd + 1, &readFds, nullptr, nullptr, &tv);
 
+    // Process edge cases
     if (ready < 0) {
         // perror("select error");
         return "";
@@ -105,7 +117,8 @@ std::string Client::read() const {
         return "";
     }
 
-    char buffer[1024];
+    // Read message
+    char buffer[MESSAGE_BUFFER_SIZE];
     sockaddr_in responderAddr;
     socklen_t addrLen = sizeof(responderAddr);
     ssize_t numBytes = recvfrom(sfd, buffer, sizeof(buffer), 0, (sockaddr*)&responderAddr, &addrLen);
@@ -122,7 +135,7 @@ int main() {
     std::srand(std::time({}));
     Client client;
 
-    client.connect("localhost", 2025);
+    client.connect(SERVER_ADDR, SERVER_PORT);
     if (!client.is_connected()) {
         std::cout << "main - Couldn't connect to the server" << std::endl;
         return 1;
@@ -140,7 +153,7 @@ int main() {
     // Start thread for reading user input and sending it to the server
     std::thread thread_client_listen([&]() {
         while (true) {
-            sleep(1);
+            sleep(CLIENT_SLEEP_BETWEEN_RECEIVE);
             std::string msg = client.read();
             if (msg.empty()) continue;
         }
