@@ -20,7 +20,7 @@
 
 class Client : public CommonCS {
 protected:
-    sockaddr_in serverSockAddr;
+    sockaddr_in server_sockaddr;
     int sfd = -1;
 
     bool connected = false;
@@ -38,7 +38,7 @@ public:
 
     void reset() {
         connected = false;
-        serverSockAddr = {};
+        server_sockaddr = {};
         if (sfd != -1) close(sfd);
         sfd = -1;
     }
@@ -67,7 +67,7 @@ bool Client::connect(const std::string& server_name, int port) {
     }
 
     // Save server address
-    memcpy(&serverSockAddr, res->ai_addr, res->ai_addrlen);
+    memcpy(&server_sockaddr, res->ai_addr, res->ai_addrlen);
     freeaddrinfo(res);
 
     // Create client socket
@@ -83,7 +83,7 @@ bool Client::connect(const std::string& server_name, int port) {
 }
 
 ssize_t Client::send(const std::string& msg) const {
-    return _send(msg, sfd, serverSockAddr);
+    return _send(msg, sfd, server_sockaddr);
 }
 
 ReadResult Client::read() const {
