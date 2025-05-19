@@ -18,7 +18,7 @@ class Client {
 protected:
     bool connected = false;
 
-    addrinfo resAddrInfo;
+    sockaddr_in serverSockAddr;
     int sfd;
 
 public:
@@ -41,17 +41,29 @@ bool Client::is_connected() const {
 }
 
 bool Client::connect(const std::string& server_name, int port) {
-    // TODO
-    const std::string port_str = std::to_string(port);
-    const char* port_cstr = port_str.data();
+    std::string port_str = std::to_string(port);
+    const char* port_cstr = port_str.c_str();
 
-    sfd = create_dgram_socket(server_name.data(), port_cstr, &resAddrInfo);
+    // Resolve server address
+    addrinfo hints, *res;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_DGRAM;
 
-    if (sfd == -1) {
-        std::cout << "Client::connect - Cannot create a socket" << std::endl;
+    if (getaddrinfo(server_name.c_str(), port_cstr, &hints, &res) != 0) {
+        printf("Failed to resolve server address\n");
         return false;
     }
 
+    memcpy(&serverSockAddr, res->ai_addr, res->ai_addrlen);
+    freeaddrinfo(res);
+
+    // Create client socket
+    sfd = create_dgram_socket(nullptr, "0", nullptr); // Bind to any available port
+    if (sfd == -1) {
+        printf("Failed to create client socket\n");
+        return false;
+    }
     connected = true;
     return true;
 }
@@ -61,65 +73,6 @@ void Client::start_listening() {
 }
 
 void Client::start_reading() {
-    // TODO
-    while (true)
-    {
-        std::string input;
-        printf(">");
-        std::getline(std::cin, input);
-        ssize_t res = sendto(sfd, input.c_str(), input.size(), 0, resAddrInfo.ai_addr, resAddrInfo.ai_addrlen);
-        if (res == -1)
-          std::cout << strerror(errno) << std::endl;
-    }
-}
-
-void Client::reset() {
-    connected = false;
-    resAddrInfo = {};
-    sfd = -1;
-}
-
-
-
-
-int main() {
-    Client client;
-
-    client.connect("localhost", 2025);
-    if (!client.is_connected()) {
-        std::cout << "main - Couldn't connect to the server" << std::endl;
-        return 1;
-    }
-
-    //client.start_listening();
-    //client.start_reading();
-
-    //while (client.is_connected()) {}
-    //return 0;
-
-
-    // Resolve server address
-    addrinfo hints, *res;
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_DGRAM;
-
-    if (getaddrinfo("localhost", "2025", &hints, &res) != 0) {
-        printf("Failed to resolve server address\n");
-        return 1;
-    }
-
-    sockaddr_in serverSockAddr;
-    memcpy(&serverSockAddr, res->ai_addr, res->ai_addrlen);
-    freeaddrinfo(res);
-
-    // Create client socket
-    int sfd = create_dgram_socket(nullptr, "0", nullptr); // Bind to any available port
-    if (sfd == -1) {
-        printf("Failed to create client socket\n");
-        return 1;
-    }
-
     const char *pingMsg = "ping";
     printf("Sending 'ping' to server...\n");
     sendto(sfd, pingMsg, strlen(pingMsg), 0, (sockaddr*)&serverSockAddr, sizeof(serverSockAddr));
@@ -153,7 +106,31 @@ int main() {
             }
         }
     }
+}
 
-    close(sfd);
+void Client::reset() {
+    connected = false;
+    serverSockAddr = {};
+    if (sfd != -1) close(sfd);
+    sfd = -1;
+}
+
+
+int main() {
+    Client client;
+
+    client.connect("localhost", 2025);
+    if (!client.is_connected()) {
+        std::cout << "main - Couldn't connect to the server" << std::endl;
+        return 1;
+    }
+
+    client.start_listening();
+    client.start_reading();
+
+    while (client.is_connected()) {}
+
+    client.reset();
+
     return 0;
 }
