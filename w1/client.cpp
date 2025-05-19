@@ -17,20 +17,6 @@
 #include "socket_tools.h"
 
 
-const char* SERVER_ADDR = "localhost";
-const int SERVER_PORT = 2025;
-const int CLIENT_SLEEP_BETWEEN_RECEIVE = 1;
-const int CLIENT_RECEIVE_TIMEOUT = 1;
-const int MESSAGE_BUFFER_SIZE = 1024;
-
-
-struct ReadResult {
-    std::string msg;
-    bool is_error = false;
-    bool is_empty = true;
-};
-
-
 class Client {
 protected:
     sockaddr_in serverSockAddr;
