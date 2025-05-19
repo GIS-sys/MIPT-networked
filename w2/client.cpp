@@ -1,6 +1,8 @@
-#include "raylib.h"
+#include <cstring>
 #include <enet/enet.h>
+#include "raylib.h"
 #include <iostream>
+
 
 void send_fragmented_packet(ENetPeer *peer)
 {

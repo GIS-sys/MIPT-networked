@@ -11,3 +11,23 @@ git submodule update --recursive --remote
 
 # How to run
 
+## w2
+
+1)
+```bash
+./compile.sh
+```
+
+2) Launch servers and client
+
+```bash
+./build/w2/client
+```
+
+```bash
+./build/w2/lobby
+```
+
+```bash
+./build/w2/server
+```
