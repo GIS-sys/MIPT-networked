@@ -13,6 +13,7 @@
 
 static std::vector<Entity> entities;
 static std::unordered_map<uint16_t, size_t> indexMap;
+static std::unordered_map<uint16_t, float> indexMapPoints;
 static uint16_t my_entity = invalid_entity;
 
 void on_new_entity_packet(ENetPacket *packet)
@@ -50,6 +51,15 @@ void on_snapshot(ENetPacket *packet)
     e.y = y;
     e.size = size;
   });
+}
+
+void on_point(ENetPacket *packet)
+{
+  uint16_t eid = invalid_entity;
+  float point = 0.f;
+  deserialize_point(packet, eid, point);
+  indexMapPoints[eid] = point;
+  std::cout << "Got new points for eid=" << eid << ": " << point << std::endl;
 }
 
 int main(int argc, const char **argv)
@@ -127,6 +137,11 @@ int main(int argc, const char **argv)
         case E_SERVER_TO_CLIENT_SNAPSHOT:
           on_snapshot(event.packet);
           break;
+        case E_SERVER_TO_CLIENT_POINT:
+          on_point(event.packet);
+          break;
+        default:
+          break;
         };
         break;
       default:
@@ -180,6 +195,16 @@ int main(int argc, const char **argv)
         }
 
       EndMode2D();
+      DrawText("Points:", 20, 20, TEXT_SIZE, WHITE);
+      int i = 2;
+      for (const auto& [eid, point] : indexMapPoints) {
+        if (eid == my_entity) {
+          DrawText(("Me (" + std::to_string(eid) + "): " + std::to_string(point)).c_str(), 20, 20 + TEXT_SIZE * 2 * 1, TEXT_SIZE, WHITE);
+          continue;
+        }
+        DrawText((std::to_string(eid) + ": " + std::to_string(point)).c_str(), 20, 20 + TEXT_SIZE * 2 * i, TEXT_SIZE, WHITE);
+        ++i;
+      }
     EndDrawing();
   }
 

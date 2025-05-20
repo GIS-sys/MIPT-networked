@@ -35,17 +35,23 @@ void on_join(ENetPacket *packet, ENetPeer *peer, ENetHost *host)
   // send all entities
   for (const Entity &ent : entities)
     send_new_entity(peer, ent);
+  // send all points
+  for (const auto& [eid, point] : controlledMapPoints) {
+    send_point(peer, eid, point);
+  }
 
   // find max eid
   uint16_t newEid = create_random_entity();
   const Entity& ent = entities[newEid];
 
   controlledMap[newEid] = peer;
-
+  controlledMapPoints[newEid] = 0;
 
   // send info about new entity to everyone
-  for (size_t i = 0; i < host->peerCount; ++i)
+  for (size_t i = 0; i < host->peerCount; ++i) {
     send_new_entity(&host->peers[i], ent);
+    send_point(&host->peers[i], newEid, controlledMapPoints[newEid]);
+  }
   // send info about controlled entity
   send_set_controlled_entity(peer, newEid);
 }
@@ -92,6 +98,7 @@ int main(int argc, const char **argv)
     uint16_t eid = create_random_entity();
     entities[eid].serverControlled = true;
     controlledMap[eid] = nullptr;
+    controlledMap[eid] = 0;
   }
 
   uint32_t lastTime = enet_time_get();
@@ -116,6 +123,8 @@ int main(int argc, const char **argv)
             break;
           case E_CLIENT_TO_SERVER_STATE:
             on_state(event.packet);
+            break;
+          default:
             break;
         };
         enet_packet_destroy(event.packet);
@@ -167,6 +176,11 @@ int main(int argc, const char **argv)
             float dpoints = std::sqrt(dsize);
             controlledMapPoints[bigger->eid] += dpoints;
             std::cout << bigger->eid << " got " << dpoints << " points, total: " << controlledMapPoints[bigger->eid] << std::endl;
+            for (size_t i = 0; i < server->peerCount; ++i)
+            {
+              ENetPeer *peer = &server->peers[i];
+              send_point(peer, bigger->eid, controlledMapPoints[bigger->eid]);
+            }
           }
           smaller->x = random_coor();
           smaller->y = random_coor();

@@ -27,14 +27,21 @@ void send_entity_state(ENetPeer *peer, uint16_t eid, float x, float y, float siz
 {
     BitStream bs;
     bs << E_CLIENT_TO_SERVER_STATE << eid << x << y << size;
-    enet_peer_send(peer, 0, bs.to_enet_packet(ENET_PACKET_FLAG_RELIABLE));
+    enet_peer_send(peer, 0, bs.to_enet_packet(ENET_PACKET_FLAG_UNSEQUENCED));
 }
 
 void send_snapshot(ENetPeer *peer, uint16_t eid, float x, float y, float size)
 {
     BitStream bs;
     bs << E_SERVER_TO_CLIENT_SNAPSHOT << eid << x << y << size;
-    enet_peer_send(peer, 0, bs.to_enet_packet(ENET_PACKET_FLAG_RELIABLE));
+    enet_peer_send(peer, 0, bs.to_enet_packet(ENET_PACKET_FLAG_UNSEQUENCED));
+}
+
+void send_point(ENetPeer *peer, uint16_t eid, float point)
+{
+    BitStream bs;
+    bs << E_SERVER_TO_CLIENT_POINT << eid << point;
+    enet_peer_send(peer, 0, bs.to_enet_packet(ENET_PACKET_FLAG_UNSEQUENCED));
 }
 
 MessageType get_packet_type(ENetPacket *packet)
@@ -74,3 +81,10 @@ void deserialize_snapshot(ENetPacket *packet, uint16_t &eid, float &x, float &y,
     bs >> eid >> x >> y >> size;
 }
 
+void deserialize_point(ENetPacket *packet, uint16_t &eid, float &point)
+{
+    BitStream bs;
+    bs.from_enet_packet(packet);
+    bs.read_n(sizeof(MessageType));
+    bs >> eid >> point;
+}
