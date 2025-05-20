@@ -1,133 +1,344 @@
-#include "raylib.h"
+#include <cstring>
 #include <enet/enet.h>
 #include <iostream>
+#include <map>
+#include <random>
+#include <string>
 
-void send_fragmented_packet(ENetPeer *peer)
-{
-  const char *baseMsg = "Stay awhile and listen. ";
-  const size_t msgLen = strlen(baseMsg);
-
-  const size_t sendSize = 2500;
-  char *hugeMessage = new char[sendSize];
-  for (size_t i = 0; i < sendSize; ++i)
-    hugeMessage[i] = baseMsg[i % msgLen];
-  hugeMessage[sendSize-1] = '\0';
-
-  ENetPacket *packet = enet_packet_create(hugeMessage, sendSize, ENET_PACKET_FLAG_RELIABLE);
-  enet_peer_send(peer, 0, packet);
-
-  delete[] hugeMessage;
+#include "raylib.h"
+#include "common.hpp"
+Vector2 to_vector2(const Vector2D& vec) {
+    return { vec.x, vec.y };
 }
 
-void send_micro_packet(ENetPeer *peer)
-{
-  const char *msg = "dv/dt";
-  ENetPacket *packet = enet_packet_create(msg, strlen(msg) + 1, ENET_PACKET_FLAG_UNSEQUENCED);
-  enet_peer_send(peer, 1, packet);
-}
+
+class NetworkClient {
+private:
+    ENetHost* client_host = nullptr;
+    ENetPeer* lobby_peer = nullptr;
+    ENetPeer* server_peer = nullptr;
+
+public:
+    ENetPeer* get_lobby_peer() const { return lobby_peer; }
+
+    ENetPeer* get_server_peer() const { return server_peer; }
+
+    NetworkClient() {
+        if (enet_initialize() != 0) {
+            throw std::runtime_error("Cannot init ENet");
+        }
+        atexit(enet_deinitialize);
+
+        client_host = enet_host_create(nullptr, 2, CHANNELS_AMOUNT, 0, 0);
+        if (!client_host) {
+            throw std::runtime_error("Cannot create client host");
+        }
+    }
+
+    ~NetworkClient() {
+        if (lobby_peer) {
+            enet_peer_disconnect(lobby_peer, 0);
+            if (client_host) enet_host_flush(client_host);
+        }
+        if (server_peer) {
+            enet_peer_disconnect(server_peer, 0);
+            if (client_host) enet_host_flush(client_host);
+        }
+        if (lobby_peer) enet_peer_reset(lobby_peer);
+        if (server_peer) enet_peer_reset(server_peer);
+        if (client_host) enet_host_destroy(client_host);
+    }
+
+    bool connect_to_lobby(const char* address, int port) {
+        ENetAddress enetAddr;
+        enet_address_set_host(&enetAddr, address);
+        enetAddr.port = port;
+
+        lobby_peer = enet_host_connect(client_host, &enetAddr, CHANNELS_AMOUNT, 0);
+        if (!lobby_peer) {
+            return false;
+        }
+        return true;
+    }
+
+    bool connect_to_server(const char* address, int port) {
+        ENetAddress enetAddr;
+        enet_address_set_host(&enetAddr, address);
+        enetAddr.port = port;
+
+        server_peer = enet_host_connect(client_host, &enetAddr, CHANNELS_AMOUNT, 0);
+        if (!lobby_peer) {
+            return false;
+        }
+        return true;
+    }
+
+    ENetEvent service(int timeout = CLIENT_SERVICE_TIMEOUT_MS) {
+        ENetEvent event;
+        enet_host_service(client_host, &event, timeout);
+        return event;
+    }
+};
+
+
+
+class Pinger {
+private:
+    float since_last_sent = 0;
+    float _ping = 0;
+public:
+    void update(float dt) {
+        since_last_sent += dt;
+    }
+
+    float ping() const { return _ping; }
+
+    bool need_ping() {
+        return since_last_sent * 1000 > CLIENT_PING_INTERVAL_MS;
+    }
+
+    void sent() {
+        since_last_sent = 0;
+    }
+
+    void got() {
+        _ping = since_last_sent / 2;
+    }
+};
+
+
+class Game {
+private:
+    std::map<int, Player> players;
+    Player me;
+    Pinger pinger;
+    NetworkClient network_client;
+    bool _is_connected_lobby = false;
+    bool _is_connected_server = false;
+    float send_data_timer = 0;
+
+public:
+    Game(int width, int height, const char* name, int fps) {
+        // Init GUI
+        InitWindow(width, height, name);
+
+        // Resize if user has small monitor
+        const int scrWidth = GetMonitorWidth(0);
+        const int scrHeight = GetMonitorHeight(0);
+        if (scrWidth < width || scrHeight < height) {
+            width = std::min(scrWidth, width);
+            height = std::min(scrHeight, height);
+            SetWindowSize(width, height);
+        }
+
+        // Set FPS
+        SetTargetFPS(fps);
+
+        // Initialize player position
+        me.pos.x = rand() % width;
+        me.pos.y = rand() % height;
+
+        // Connect to lobby
+        if (!network_client.connect_to_lobby(LOBBY_ADDR.c_str(), LOBBY_PORT)) {
+            throw std::runtime_error("Cannot connect to lobby");
+        }
+    }
+
+    bool is_connected_lobby() const { return _is_connected_lobby; }
+    bool is_connected_server() const { return _is_connected_server; }
+
+    ~Game() {
+        CloseWindow();
+    }
+
+    void update(float dt) {
+        // Handle input
+        bool left = IsKeyDown(KEY_LEFT);
+        bool right = IsKeyDown(KEY_RIGHT);
+        bool up = IsKeyDown(KEY_UP);
+        bool down = IsKeyDown(KEY_DOWN);
+        bool enter = IsKeyDown(KEY_ENTER);
+
+        // Calculate speed based on pressed buttons
+        Vector2D speed;
+        if (left) speed.x -= 1;
+        if (right) speed.x += 1;
+        if (up) speed.y -= 1;
+        if (down) speed.y += 1;
+        speed = speed.normalize() * PLAYER_SPEED;
+        me.pos = me.pos + speed * dt;
+
+        // If enter is pressed, and not yet connected to the game server - send request to lobby
+        if (enter && !is_connected_server()) {
+            std::cout << "Requesting game server address and port from lobby" << std::endl;
+            send(SYSCMD_START, network_client.get_lobby_peer(), CHANNEL_LOBBY_START, true);
+        }
+
+        // If connected to the server - try to pass my position
+        send_data_timer -= dt;
+        if (is_connected_server() && send_data_timer < 0) {
+            // COUT
+            send(prepare_for_send(me.to_string_vector({ .pos = true, .ping = true })), network_client.get_server_peer(), CHANNEL_SERVER_PLAYERS_DATA, true);
+            send_data_timer = CLIENT_SEND_DATA_INTERVAL_MS / 1000;
+        }
+
+        // Also update ping
+        pinger.update(dt);
+        if (is_connected_server() && pinger.need_ping()) {
+            std::cout << "Sending ping" << std::endl;
+            pinger.sent();
+            send("ping", network_client.get_server_peer(), CHANNEL_SERVER_PING, false);
+        }
+    }
+
+    void render_player(const Player& player, int x, int y) const {
+        DrawText(("ID: " + std::to_string(player.id) + " Name: " + player.name + " Ping: " + std::to_string(player.ping)).c_str(), x, y, 20, WHITE);
+        DrawCircleV(to_vector2(player.pos), PLAYER_SIZE, WHITE);
+    }
+
+    void render() const {
+        BeginDrawing();
+        {
+            // Clear
+            ClearBackground(BLACK);
+
+            // Current status
+            std::string status = "ERROR";
+            if (is_connected_lobby()) {
+                status = "lobby";
+            }
+            if (is_connected_server()) {
+                status = "in-game";
+            }
+            DrawText(("Current status: " + status).c_str(), 20, 20, 20, WHITE);
+
+            // My info
+            render_player(me, 20, 60);
+
+            // List all players
+            DrawText("List of players:", 20, 100, 20, WHITE);
+            int i = 0;
+            for (const auto& player_it : players) {
+                render_player(player_it.second, 40, 140 + 20 * i);
+                ++i;
+            }
+        }
+        EndDrawing();
+    }
+
+    void run() {
+        while (!WindowShouldClose()) {
+            const float dt = GetFrameTime();
+
+            ENetEvent event = network_client.service();
+            handleNetworkEvent(event);
+
+            update(dt);
+            render();
+        }
+    }
+
+    void handleNetworkEvent(const ENetEvent& event) {
+        switch (event.type) {
+            case ENET_EVENT_TYPE_NONE:
+                break;
+
+            case ENET_EVENT_TYPE_CONNECT:
+                std::cout << "Connected: " << event.peer->address.host << ":" << event.peer->address.port << std::endl;
+                if (!_is_connected_lobby) _is_connected_lobby = true;
+                else _is_connected_server = true;
+                break;
+
+            case ENET_EVENT_TYPE_DISCONNECT:
+                std::cout << "Disconnected: " << event.peer->address.host << ":" << event.peer->address.port << std::endl;
+                event.peer->data = nullptr;
+                CloseWindow();
+                break;
+
+            case ENET_EVENT_TYPE_RECEIVE:
+                handlePacket(event);
+                enet_packet_destroy(event.packet);
+                break;
+
+            default:
+                std::cout << "WTF is that?" << std::endl;
+                break;
+        }
+    }
+
+    void handlePacket(const ENetEvent& event) {
+        if (DEBUG) std::cout << "Got data from ch=" << (int)event.channelID << " " << event.peer->address.host << ":" << event.peer->address.port << " - " << event.packet->data << std::endl;
+
+        const char* msgData = reinterpret_cast<const char*>(event.packet->data);
+
+        // Decide what to do depending on the channel
+        if (event.channelID == CHANNEL_LOBBY_START) {
+            if (is_connected_server()) return;
+            // Parse lobby data to connect to server
+            std::string msg(msgData);
+            std::vector<std::string> parsed = parse_from_receive(msg);
+            std::string server_addr = parsed[0];
+            int server_port = std::atoi(parsed[1].c_str());
+            std::cout << "Connecting to game server: addr=" << server_addr << " port=" << server_port << std::endl;
+            network_client.connect_to_server(server_addr.c_str(), server_port);
+            return;
+        }
+        if (event.channelID == CHANNEL_SERVER_PLAYER_CRED) {
+            // Parse player data
+            std::string msg(msgData);
+            std::vector<std::string> parsed = parse_from_receive(msg);
+            Player player_data = Player::from_string_vector(parsed, { .name = true, .id = true });
+            me.id = player_data.id;
+            me.name = player_data.name;
+            std::cout << "Got new credentials: name=" << me.name << " id=" << me.id << std::endl;
+            return;
+        }
+        if (event.channelID == CHANNEL_SERVER_PING) {
+            pinger.got();
+            me.ping = pinger.ping();
+            std::cout << "Got pong, current ping: " << me.ping << std::endl;
+            return;
+        }
+        if (event.channelID == CHANNEL_SERVER_PLAYERS_LIST) {
+            std::cout << "Got new players list" << std::endl;
+            std::string msg(msgData);
+            std::vector<std::string> parsed = parse_from_receive(msg);
+            PlayerUseData use{ .name = true, .id = true };
+            players.clear();
+            for (int i = 0; i < parsed.size(); i += use.length()) {
+                Player player = Player::from_string_vector(parsed, use, i);
+                std::cout << "\t" << player.id << ", " << player.name << std::endl;
+                players[player.id] = player;
+            }
+            return;
+        }
+        if (event.channelID == CHANNEL_SERVER_PLAYERS_DATA) {
+            std::string msg(msgData);
+            std::vector<std::string> parsed = parse_from_receive(msg);
+            PlayerUseData use{ .name = true, .id = true, .pos = true, .ping = true };
+            for (int i = 0; i < parsed.size(); i += use.length()) {
+                Player player = Player::from_string_vector(parsed, use, i);
+                if (players.find(player.id) != players.end()) {
+                    if (players[player.id].pos != player.pos) {
+                        std::cout << "Position has changed for player id=" << player.id << " - "
+                                  << "from " << players[player.id].pos.x << "," << players[player.id].pos.y << " "
+                                  << "to " << player.pos.x << "," << player.pos.y << std::endl;
+                    }
+                    players[player.id].pos = player.pos;
+                    players[player.id].ping = player.ping;
+                }
+            }
+            return;
+        }
+    }
+};
+
 
 int main(int argc, const char **argv)
 {
-  int width = 800;
-  int height = 600;
-  InitWindow(width, height, "w2 MIPT networked");
+    srand(time({}));
+    Game game(WIDTH, HEIGHT, NAME, FPS);
+    game.run();
 
-  const int scrWidth = GetMonitorWidth(0);
-  const int scrHeight = GetMonitorHeight(0);
-  if (scrWidth < width || scrHeight < height)
-  {
-    width = std::min(scrWidth, width);
-    height = std::min(scrHeight - 150, height);
-    SetWindowSize(width, height);
-  }
-
-  SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
-
-  if (enet_initialize() != 0)
-  {
-    printf("Cannot init ENet");
-    return 1;
-  }
-
-  ENetHost *client = enet_host_create(nullptr, 1, 2, 0, 0);
-  if (!client)
-  {
-    printf("Cannot create ENet client\n");
-    return 1;
-  }
-
-  ENetAddress address;
-  enet_address_set_host(&address, "localhost");
-  address.port = 10887;
-
-  ENetPeer *lobbyPeer = enet_host_connect(client, &address, 2, 0);
-  if (!lobbyPeer)
-  {
-    printf("Cannot connect to lobby");
-    return 1;
-  }
-
-  uint32_t timeStart = enet_time_get();
-  uint32_t lastFragmentedSendTime = timeStart;
-  uint32_t lastMicroSendTime = timeStart;
-  bool connected = false;
-  float posx = GetRandomValue(100, 1000);
-  float posy = GetRandomValue(100, 500);
-  float velx = 0.f;
-  float vely = 0.f;
-  while (!WindowShouldClose())
-  {
-    const float dt = GetFrameTime();
-    ENetEvent event;
-    while (enet_host_service(client, &event, 10) > 0)
-    {
-      switch (event.type)
-      {
-      case ENET_EVENT_TYPE_CONNECT:
-        printf("Connection with %x:%u established\n", event.peer->address.host, event.peer->address.port);
-        connected = true;
-        break;
-      case ENET_EVENT_TYPE_RECEIVE:
-        printf("Packet received '%s'\n", event.packet->data);
-        enet_packet_destroy(event.packet);
-        break;
-      default:
-        break;
-      };
-    }
-    if (connected)
-    {
-      uint32_t curTime = enet_time_get();
-      if (curTime - lastFragmentedSendTime > 1000)
-      {
-        lastFragmentedSendTime = curTime;
-        send_fragmented_packet(lobbyPeer);
-      }
-      if (curTime - lastMicroSendTime > 100)
-      {
-        lastMicroSendTime = curTime;
-        send_micro_packet(lobbyPeer);
-      }
-    }
-    bool left = IsKeyDown(KEY_LEFT);
-    bool right = IsKeyDown(KEY_RIGHT);
-    bool up = IsKeyDown(KEY_UP);
-    bool down = IsKeyDown(KEY_DOWN);
-    constexpr float accel = 30.f;
-    velx += ((left ? -1.f : 0.f) + (right ? 1.f : 0.f)) * dt * accel;
-    vely += ((up ? -1.f : 0.f) + (down ? 1.f : 0.f)) * dt * accel;
-    posx += velx * dt;
-    posy += vely * dt;
-    velx *= 0.99f;
-    vely *= 0.99f;
-
-    BeginDrawing();
-      ClearBackground(BLACK);
-      DrawText(TextFormat("Current status: %s", "unknown"), 20, 20, 20, WHITE);
-      DrawText(TextFormat("My position: (%d, %d)", (int)posx, (int)posy), 20, 40, 20, WHITE);
-      DrawText("List of players:", 20, 60, 20, WHITE);
-      DrawCircleV(Vector2{posx, posy}, 10.f, WHITE);
-    EndDrawing();
-  }
-  return 0;
+    return 0;
 }
