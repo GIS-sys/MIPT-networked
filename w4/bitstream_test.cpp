@@ -28,9 +28,9 @@ struct Complex {
         return bs;
     }
 
-    friend BitStream& operator>>(BitStream& bs, Complex* complex) {
-        bs >> &complex->a;
-        bs >> &complex->b;
+    friend BitStream& operator>>(BitStream& bs, Complex& complex) {
+        bs >> complex.a;
+        bs >> complex.b;
         return bs;
     }
 };
@@ -43,7 +43,7 @@ int main() {
         bs << x.a << x.b << x.c;
 
         Simple y;
-        bs >> &y.a >> &y.b >> &y.c;
+        bs >> y.a >> y.b >> y.c;
 
         std::cout << "Was " << x << std::endl;
         std::cout << "Now " << y << std::endl;
@@ -54,7 +54,7 @@ int main() {
         bs << x;
 
         Complex y;
-        bs >> &y;
+        bs >> y;
 
         std::cout << "Was " << x << std::endl;
         std::cout << "Now " << y << std::endl;

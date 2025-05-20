@@ -46,31 +46,31 @@ void deserialize_new_entity(ENetPacket *packet, Entity &ent)
 {
     BitStream bs;
     bs.from_enet_packet(packet);
-    bs.read(sizeof(MessageType));
-    bs >> &ent;
+    bs.read_n(sizeof(MessageType));
+    bs >> ent;
 }
 
 void deserialize_set_controlled_entity(ENetPacket *packet, uint16_t &eid)
 {
     BitStream bs;
     bs.from_enet_packet(packet);
-    bs.read(sizeof(MessageType));
-    bs >> &eid;
+    bs.read_n(sizeof(MessageType));
+    bs >> eid;
 }
 
 void deserialize_entity_state(ENetPacket *packet, uint16_t &eid, float &x, float &y)
 {
     BitStream bs;
     bs.from_enet_packet(packet);
-    bs.read(sizeof(MessageType));
-    bs >> &eid >> &x >> &y;
+    bs.read_n(sizeof(MessageType));
+    bs >> eid >> x >> y;
 }
 
 void deserialize_snapshot(ENetPacket *packet, uint16_t &eid, float &x, float &y)
 {
     BitStream bs;
     bs.from_enet_packet(packet);
-    bs.read(sizeof(MessageType));
-    bs >> &eid >> &x >> &y;
+    bs.read_n(sizeof(MessageType));
+    bs >> eid >> x >> y;
 }
 

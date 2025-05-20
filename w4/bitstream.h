@@ -94,16 +94,16 @@ public:
     }
 
     // Different READ operations
-    char* read(size_t amount) { // CAREFUL - the memory may be freed at any next call!
+    char* read_n(size_t amount) { // CAREFUL - the memory may be freed at any next call!
         _skip += amount;
         _size -= amount;
         return _data + _skip - amount;
     }
 
     template <typename T>
-    BitStream& operator>>(T* x) {
+    BitStream& operator>>(T& x) {
         size_t tsize = sizeof(T);
-        std::memcpy((void*)x, _data + _skip, tsize);
+        std::memcpy((void*)&x, _data + _skip, tsize);
         _skip += tsize;
         _size -= tsize;
         shrink();
@@ -111,16 +111,12 @@ public:
     }
 
     template <typename T>
-    BitStream& read(T* x) { return *this >> x; }
+    BitStream& read(T& x) { return *this >> x; }
 
-    BitStream& operator>>(size_t x) {
-        throw std::runtime_error("BitStream got << size_t - please use explicitly pointers");
-    }
-
-    BitStream& operator>>(std::string* x) {
+    BitStream& operator>>(std::string& x) {
         size_t size;
-        *this >> &size;
-        *x = read(size + 1);
+        *this >> size;
+        x = read_n(size + 1);
         return *this;
     }
 
