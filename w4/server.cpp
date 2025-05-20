@@ -17,9 +17,10 @@ static uint16_t create_random_entity()
                    0x00440000 * (1 + rand() % 4) +
                    0x00004400 * (1 + rand() % 4) +
                    0x00000044 * (1 + rand() % 4);
-  float x = (rand() % 40 - 20) * 5.f;
-  float y = (rand() % 40 - 20) * 5.f;
-  Entity ent = {color, x, y, newEid, false, 0.f, 0.f};
+  float x = (rand() % 400 - 200) * 5.f;
+  float y = (rand() % 400 - 200) * 5.f;
+  float size = 10.0f * (1 + 0.01f * (rand() % 1000 - 499.5f));
+  Entity ent = {color, x, y, newEid, false, 0.f, 0.f, size};
   entities.push_back(ent);
   return newEid;
 }
@@ -47,8 +48,8 @@ void on_join(ENetPacket *packet, ENetPeer *peer, ENetHost *host)
 void on_state(ENetPacket *packet)
 {
   uint16_t eid = invalid_entity;
-  float x = 0.f; float y = 0.f;
-  deserialize_entity_state(packet, eid, x, y);
+  float x = 0.f; float y = 0.f; float size = 0.f;
+  deserialize_entity_state(packet, eid, x, y, size);
   for (Entity &e : entities)
     if (e.eid == eid)
     {
@@ -134,13 +135,39 @@ int main(int argc, const char **argv)
         }
       }
     }
+    std::cout << "checking" << std::endl;
+    for (Entity &e1 : entities)
+    {
+      for (Entity &e2 : entities)
+      {
+        if (e1.eid == e2.eid) continue;
+        const float diffX = std::abs(e1.x - e2.x);
+        const float diffY = std::abs(e1.y - e2.y);
+        bool touch = (diffX * 2 < e1.size + e2.size) && (diffY * 2 < e1.size + e2.size);
+        if (touch) {
+          Entity* bigger; Entity* smaller;
+          if (e1.size > e2.size) {
+              bigger = &e1;
+              smaller = &e2;
+          } else {
+              bigger = &e2;
+              smaller = &e1;
+          }
+          bigger->size += smaller->size / 2;
+          smaller->size /= 2;
+          smaller->x += 10; // TODO
+          smaller->y += 10;
+          std::cout << bigger->eid << " ate " << smaller->eid << std::endl;
+        }
+      }
+    }
     for (const Entity &e : entities)
     {
       for (size_t i = 0; i < server->peerCount; ++i)
       {
         ENetPeer *peer = &server->peers[i];
         if (controlledMap[e.eid] != peer)
-          send_snapshot(peer, e.eid, e.x, e.y);
+          send_snapshot(peer, e.eid, e.x, e.y, e.size);
       }
     }
     //usleep(400000);

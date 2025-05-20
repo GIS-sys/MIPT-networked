@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <random>
 
 constexpr uint16_t invalid_entity = -1;
 struct Entity
@@ -11,5 +12,7 @@ struct Entity
   bool serverControlled = false;
   float targetX = 0.f;
   float targetY = 0.f;
+
+  float size = 1.0f;
 };
 

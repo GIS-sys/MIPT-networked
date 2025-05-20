@@ -4,6 +4,7 @@
 #include <enet/enet.h>
 #include <stdio.h>
 
+#include <string>
 #include <vector>
 #include "entity.h"
 #include "protocol.h"
@@ -40,8 +41,8 @@ static void get_entity(uint16_t eid, Callable c)
 void on_snapshot(ENetPacket *packet)
 {
   uint16_t eid = invalid_entity;
-  float x = 0.f; float y = 0.f;
-  deserialize_snapshot(packet, eid, x, y);
+  float x = 0.f; float y = 0.f; float size = 0.f;
+  deserialize_snapshot(packet, eid, x, y, size);
   get_entity(eid, [&](Entity& e)
   {
     e.x = x;
@@ -75,8 +76,8 @@ int main(int argc, const char **argv)
     return 1;
   }
 
-  int width = 800;
-  int height = 600;
+  int width = 1200;
+  int height = 1000;
   InitWindow(width, height, "w4 networked MIPT");
 
   const int scrWidth = GetMonitorWidth(0);
@@ -143,7 +144,7 @@ int main(int argc, const char **argv)
         e.y += ((up ? -dt : 0.f) + (down ? +dt : 0.f)) * 100.f;
 
         // Send
-        send_entity_state(serverPeer, my_entity, e.x, e.y);
+        send_entity_state(serverPeer, my_entity, e.x, e.y, e.size);
         camera.target.x = e.x;
         camera.target.y = e.y;
       });
@@ -155,8 +156,9 @@ int main(int argc, const char **argv)
       BeginMode2D(camera);
         for (const Entity &e : entities)
         {
-          const Rectangle rect = {e.x, e.y, 10.f, 10.f};
+          const Rectangle rect = {e.x, e.y, e.size, e.size};
           DrawRectangleRec(rect, GetColor(e.color));
+          DrawText(std::to_string(e.eid).c_str(), e.x, e.y, 4.0, GetColor(e.color));
         }
 
       EndMode2D();
