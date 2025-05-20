@@ -3,6 +3,7 @@
 #include "raylib.h"
 #include <enet/enet.h>
 #include <stdio.h>
+#include <iostream>
 
 #include <string>
 #include <vector>
@@ -161,6 +162,16 @@ int main(int argc, const char **argv)
           DrawRectangleRec(rect, GetColor(e.color));
           DrawText(std::to_string(e.eid).c_str(), e.x + e.size / 2, e.y - e.size, 4.0, GetColor(e.color));
           DrawText(std::to_string(e.size).c_str(), e.x + e.size / 2, e.y + e.size / 2, 4.0, GetColor(e.color));
+          for (const Entity &e2 : entities)
+          {
+              if (e.eid == e2.eid) continue;
+              const float diffX = std::abs(e.x - e2.x);
+              const float diffY = std::abs(e.y - e2.y);
+              float almost_touch = std::max(diffX, diffY) * 2 / (e.size + e2.size);
+              if (almost_touch < 5) {
+                  DrawLine(e.x, e.y, e2.x, e2.y, GetColor((e.color + e2.color) / 2));
+              }
+          }
         }
 
       EndMode2D();

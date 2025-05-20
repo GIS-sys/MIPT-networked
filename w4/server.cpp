@@ -23,7 +23,7 @@ static uint16_t create_random_entity()
                    0x00000044 * (1 + rand() % 4);
   float x = random_coor();
   float y = random_coor();
-  float size = 10.0f * (1 + 0.01f * (rand() % 1000 - 499.5f));
+  float size = 10.0f * (1 + 0.001f * (rand() % 1000 - 499.5f));
   Entity ent = {color, x, y, newEid, false, 0.f, 0.f, size};
   entities.push_back(ent);
   return newEid;
