@@ -9,9 +9,10 @@
 
 static std::vector<Entity> entities;
 static std::map<uint16_t, ENetPeer*> controlledMap;
+static std::map<uint16_t, float> controlledMapPoints;
 
 float random_coor() {
-    return (rand() % 200 - 100) * 5.f;
+    return (rand() % 200 - 100) * 4.f;
 }
 
 static uint16_t create_random_entity()
@@ -158,11 +159,17 @@ int main(int argc, const char **argv)
               bigger = &e2;
               smaller = &e1;
           }
-          bigger->size = std::sqrt(bigger->size * bigger->size + smaller->size * smaller->size / 4);
-          smaller->size /= 2;
+          std::cout << bigger->eid << " ate " << smaller->eid << std::endl;
+          float dsize = smaller->size / 2;
+          bigger->size = std::sqrt(bigger->size * bigger->size + dsize * dsize);
+          smaller->size = std::sqrt(smaller->size * smaller->size - dsize * dsize);
+          if (!bigger->serverControlled) {
+            float dpoints = std::sqrt(dsize);
+            controlledMapPoints[bigger->eid] += dpoints;
+            std::cout << bigger->eid << " got " << dpoints << " points, total: " << controlledMapPoints[bigger->eid] << std::endl;
+          }
           smaller->x = random_coor();
           smaller->y = random_coor();
-          std::cout << bigger->eid << " ate " << smaller->eid << std::endl;
         }
       }
     }
