@@ -47,6 +47,7 @@ void on_snapshot(ENetPacket *packet)
   {
     e.x = x;
     e.y = y;
+    e.size = size;
   });
 }
 
@@ -156,9 +157,10 @@ int main(int argc, const char **argv)
       BeginMode2D(camera);
         for (const Entity &e : entities)
         {
-          const Rectangle rect = {e.x, e.y, e.size, e.size};
+          const Rectangle rect = {e.x - e.size / 2, e.y - e.size / 2, e.size, e.size};
           DrawRectangleRec(rect, GetColor(e.color));
-          DrawText(std::to_string(e.eid).c_str(), e.x, e.y, 4.0, GetColor(e.color));
+          DrawText(std::to_string(e.eid).c_str(), e.x + e.size / 2, e.y - e.size, 4.0, GetColor(e.color));
+          DrawText(std::to_string(e.size).c_str(), e.x + e.size / 2, e.y + e.size / 2, 4.0, GetColor(e.color));
         }
 
       EndMode2D();

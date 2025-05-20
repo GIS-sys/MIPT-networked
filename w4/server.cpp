@@ -10,6 +10,10 @@
 static std::vector<Entity> entities;
 static std::map<uint16_t, ENetPeer*> controlledMap;
 
+float random_coor() {
+    return (rand() % 200 - 100) * 5.f;
+}
+
 static uint16_t create_random_entity()
 {
   uint16_t newEid = entities.size();
@@ -17,8 +21,8 @@ static uint16_t create_random_entity()
                    0x00440000 * (1 + rand() % 4) +
                    0x00004400 * (1 + rand() % 4) +
                    0x00000044 * (1 + rand() % 4);
-  float x = (rand() % 400 - 200) * 5.f;
-  float y = (rand() % 400 - 200) * 5.f;
+  float x = random_coor();
+  float y = random_coor();
   float size = 10.0f * (1 + 0.01f * (rand() % 1000 - 499.5f));
   Entity ent = {color, x, y, newEid, false, 0.f, 0.f, size};
   entities.push_back(ent);
@@ -55,6 +59,8 @@ void on_state(ENetPacket *packet)
     {
       e.x = x;
       e.y = y;
+      e.size = size;
+      break;
     }
 }
 
@@ -130,12 +136,11 @@ int main(int argc, const char **argv)
         e.y += dirY * spd * dt;
         if (fabsf(diffX) < 10.f && fabsf(diffY) < 10.f)
         {
-          e.targetX = (rand() % 40 - 20) * 15.f;
-          e.targetY = (rand() % 40 - 20) * 15.f;
+          e.targetX = random_coor();
+          e.targetY = random_coor();
         }
       }
     }
-    std::cout << "checking" << std::endl;
     for (Entity &e1 : entities)
     {
       for (Entity &e2 : entities)
@@ -153,10 +158,10 @@ int main(int argc, const char **argv)
               bigger = &e2;
               smaller = &e1;
           }
-          bigger->size += smaller->size / 2;
+          bigger->size = std::sqrt(bigger->size * bigger->size + smaller->size * smaller->size / 4);
           smaller->size /= 2;
-          smaller->x += 10; // TODO
-          smaller->y += 10;
+          smaller->x = random_coor();
+          smaller->y = random_coor();
           std::cout << bigger->eid << " ate " << smaller->eid << std::endl;
         }
       }
