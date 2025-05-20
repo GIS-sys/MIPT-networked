@@ -21,6 +21,8 @@ class BitStream {
     size_t _size = 0;
     size_t _skip = 0;
 
+    bool _is_view = false; // if generated from packet, then will not delete data itself
+
     void ensure_cap(size_t additional_size) {
         if (_skip + _size + additional_size < _cap) return;
         size_t new_cap = _cap;
@@ -57,11 +59,16 @@ public:
     }
 
     ~BitStream() {
-        delete[] _data;
+        if (!_is_view) delete[] _data;
+    }
+
+    void check_view() {
+        if (_is_view) throw std::runtime_error("BitStream was initialized from a buffer. It can't write anything else");
     }
 
     // Different WRITE operations
     BitStream& write(const char* ptr, size_t amount) {
+        check_view();
         ensure_cap(amount);
         std::memcpy(_data + _skip + _size, ptr, amount);
         _size += amount;
@@ -70,11 +77,13 @@ public:
 
     template <typename T>
     BitStream& operator<<(const T& x) {
+        check_view();
         write((char*)&x, sizeof(T));
         return *this;
     }
 
     BitStream& operator<<(const std::string& x) {
+        check_view();
         *this << (size_t)x.size();
         write(x.c_str(), x.size());
         *this << '\0';
@@ -117,8 +126,18 @@ public:
     operator bool() const { return _size != 0; }
 
     ENetPacket* to_enet_packet(_ENetPacketFlag reliable_flag) const {
-        ENetPacket *packet = enet_packet_create(nullptr, _size, reliable_flag);
+        ENetPacket* packet = enet_packet_create(nullptr, _size, reliable_flag);
         memcpy(packet->data, _data + _skip, _size);
+        return packet;
+    }
+
+    ENetPacket* from_enet_packet(ENetPacket* packet) {
+        delete[] _data;
+        _data = (char*)packet->data;
+        _cap = packet->dataLength;
+        _size = packet->dataLength;
+        _skip = 0;
+        _is_view = true;
         return packet;
     }
 };
