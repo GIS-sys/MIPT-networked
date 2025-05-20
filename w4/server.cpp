@@ -171,7 +171,7 @@ int main(int argc, const char **argv)
       for (size_t i = 0; i < server->peerCount; ++i)
       {
         ENetPeer *peer = &server->peers[i];
-        if (controlledMap[e.eid] != peer)
+        //if (controlledMap[e.eid] != peer)
           send_snapshot(peer, e.eid, e.x, e.y, e.size);
       }
     }
