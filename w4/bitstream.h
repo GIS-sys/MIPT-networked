@@ -82,6 +82,9 @@ public:
         return *this;
     }
 
+    template <typename T>
+    BitStream& write(const T& x) { return *this << x; }
+
     BitStream& operator<<(const std::string& x) {
         check_view();
         *this << (size_t)x.size();
@@ -106,6 +109,9 @@ public:
         shrink();
         return *this;
     }
+
+    template <typename T>
+    BitStream& read(T* x) { return *this >> x; }
 
     BitStream& operator>>(size_t x) {
         throw std::runtime_error("BitStream got << size_t - please use explicitly pointers");
