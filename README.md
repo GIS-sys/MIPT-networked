@@ -27,3 +27,7 @@ git submodule update --recursive --remote
 ```bash
 ./build/w5/w5
 ```
+
+## Based on:
+
+https://habr.com/ru/articles/328702/
