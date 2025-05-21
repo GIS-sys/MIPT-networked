@@ -1,4 +1,14 @@
 #include "snapshot_history.h"
+#include "utils.h"
+
+// TODO
+//   CLIENT_INTERPOLATION_DELAY_US
+//   clear old
+//   track time?
+//   track sim frame ids
+//   interpolate?
+//   simulate
+//   delta from history ???
 
 void SnapshotHistory::init(const Entity& e) {
     // TODO

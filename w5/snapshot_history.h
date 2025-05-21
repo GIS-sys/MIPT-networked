@@ -3,6 +3,7 @@
 #include <deque>
 
 #include "entity.h"
+#include "utils.h"
 
 
 class SnapshotHistory {
