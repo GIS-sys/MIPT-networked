@@ -9,6 +9,7 @@
 #include <vector>
 #include "entity.h"
 #include "protocol.h"
+#include "utils.h"
 
 
 static std::vector<Entity> entities;
@@ -155,8 +156,8 @@ int main(int argc, const char **argv)
   }
 
   ENetAddress address;
-  enet_address_set_host(&address, "localhost");
-  address.port = 10131;
+  enet_address_set_host(&address, SERVER_HOST);
+  address.port = SERVER_PORT;
 
   ENetPeer *serverPeer = enet_host_connect(client, &address, 2, 0);
   if (!serverPeer)
@@ -165,10 +166,10 @@ int main(int argc, const char **argv)
     return 1;
   }
 
-  int width = 600;
-  int height = 600;
+  int width = CLIENT_WIDTH;
+  int height = CLIENT_HEIGHT;
 
-  InitWindow(width, height, "w5 networked MIPT");
+  InitWindow(width, height, CLIENT_NAME);
 
   const int scrWidth = GetMonitorWidth(0);
   const int scrHeight = GetMonitorHeight(0);
@@ -185,7 +186,7 @@ int main(int argc, const char **argv)
   camera.rotation = 0.f;
   camera.zoom = 10.f;
 
-  SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
+  SetTargetFPS(CLIENT_FPS);
 
   while (!WindowShouldClose())
   {

@@ -7,6 +7,8 @@
 #include <vector>
 #include <map>
 
+#include "utils.h"
+
 static std::vector<Entity> entities;
 static std::map<uint16_t, ENetPeer*> controlledMap;
 
@@ -113,9 +115,8 @@ int main(int argc, const char **argv)
     return 1;
   }
   ENetAddress address;
-
-  address.host = ENET_HOST_ANY;
-  address.port = 10131;
+  enet_address_set_host(&address, SERVER_HOST);
+  address.port = SERVER_PORT;
 
   ENetHost *server = enet_host_create(&address, 32, 2, 0, 0);
 
@@ -138,7 +139,7 @@ int main(int argc, const char **argv)
 
     printf("%d\n", curTime);
 
-    usleep(100000);
+    usleep(SERVER_DELAY_PING_SIMULATION_MS);
   }
 
   enet_host_destroy(server);
