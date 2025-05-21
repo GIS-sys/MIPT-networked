@@ -2,6 +2,7 @@
 //
 #include <functional>
 #include "raylib.h"
+#include <map>
 #include <enet/enet.h>
 #include <math.h>
 #include <stdio.h>
@@ -11,21 +12,18 @@
 #include "entity.h"
 #include "protocol.h"
 #include "utils.h"
+#include "snapshot_history.h"
 
 
-static std::vector<Entity> entities;
-static std::unordered_map<uint16_t, size_t> indexMap;
+static std::map<uint16_t, SnapshotHistory> snapshot_history;
 static uint16_t my_entity = invalid_entity;
 
 void on_new_entity_packet(ENetPacket *packet)
 {
   Entity newEntity;
   deserialize_new_entity(packet, newEntity);
-  auto itf = indexMap.find(newEntity.eid);
-  if (itf != indexMap.end())
-    return; // don't need to do anything, we already have entity
-  indexMap[newEntity.eid] = entities.size();
-  entities.push_back(newEntity);
+  snapshot_history[newEntity.eid] = SnapshotHistory();
+  snapshot_history[newEntity.eid].init(newEntity);
 }
 
 void on_set_controlled_entity(ENetPacket *packet)
@@ -34,30 +32,20 @@ void on_set_controlled_entity(ENetPacket *packet)
 }
 
 template<typename Callable>
-static void get_entity(uint16_t eid, Callable c)
+static void call_on_history(uint16_t eid, Callable c)
 {
-  auto itf = indexMap.find(eid);
-  if (itf != indexMap.end())
-    c(entities[itf->second]);
+  auto itf = snapshot_history.find(eid);
+  if (itf != snapshot_history.end())
+    c(itf->second);
 }
 
 void on_snapshot(ENetPacket *packet)
 {
   Entity e_got;
   int current_sim_frame_id = 0;
-  float dt = 0;
-  deserialize_snapshot(packet, e_got, current_sim_frame_id, dt);
-  get_entity(e_got.eid, [&](Entity& e)
-  {
-      e.x = e_got.x;
-      e.y = e_got.y;
-      e.vx = e_got.vx;
-      e.vy = e_got.vy;
-      e.ori = e_got.ori;
-      e.omega = e_got.omega;
-      e.thr = e_got.thr;
-      e.steer = e_got.steer;
-  });
+  uint32_t curTime = 0;
+  deserialize_snapshot(packet, e_got, current_sim_frame_id, curTime);
+  call_on_history(e_got.eid, [&](SnapshotHistory& h) { h.add(e_got, current_sim_frame_id, curTime); });
 }
 
 static void on_time(ENetPacket *packet, ENetPeer* peer)
@@ -122,11 +110,12 @@ static void simulate_world(ENetPeer* serverPeer)
     bool right = IsKeyDown(KEY_RIGHT);
     bool up = IsKeyDown(KEY_UP);
     bool down = IsKeyDown(KEY_DOWN);
-    get_entity(my_entity, [&](Entity& e)
+    call_on_history(my_entity, [&](SnapshotHistory& h)
     {
         // Update
         float thr = (up ? 1.f : 0.f) + (down ? -1.f : 0.f);
         float steer = (left ? -1.f : 0.f) + (right ? 1.f : 0.f);
+        h.update_controls(thr, steer);
 
         // Send
         send_entity_input(serverPeer, my_entity, thr, steer);
@@ -140,8 +129,8 @@ static void draw_world(const Camera2D& camera)
     ClearBackground(GRAY);
     BeginMode2D(camera);
 
-      for (const Entity &e : entities)
-        draw_entity(e);
+      for (const auto& itf : snapshot_history)
+        draw_entity(itf.second.get_current_entity());
 
     EndMode2D();
   EndDrawing();
@@ -197,9 +186,9 @@ int main(int argc, const char **argv)
 
   while (!WindowShouldClose())
   {
-    float dt = GetFrameTime(); // for future use and making it look smooth
-
     update_net(client, serverPeer);
+    for (auto& itf : snapshot_history)
+        itf.second.set_time(enet_time_get());
     simulate_world(serverPeer);
     draw_world(camera);
     printf("%d\n", enet_time_get());
