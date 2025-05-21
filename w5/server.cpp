@@ -25,10 +25,10 @@ void on_join(ENetPacket *packet, ENetPeer *peer, ENetHost *host)
   for (const Entity &e : entities)
     maxEid = std::max(maxEid, e.eid);
   uint16_t newEid = maxEid + 1;
-  uint32_t color = 0xff666666 +
-                   0x00110000 * (rand() % 3) +
-                   0x00001100 * (rand() % 3) +
-                   0x00000011 * (rand() % 3);
+  uint32_t color = COLOR_A +
+                   COLOR_R * (rand() % 4 + 1) +
+                   COLOR_G * (rand() % 4 + 1) +
+                   COLOR_B * (rand() % 4 + 1);
   float x = (rand() % 4) * 5.f;
   float y = (rand() % 4) * 5.f;
   Entity ent = { .color=color, .x=x, .y=y, .vx=0.f, .vy=0.f, .ori=(rand() * 1.0f / RAND_MAX) * 3.141592654f, .omega=0.f, .thr=0.f, .steer=0.f, .eid=newEid};

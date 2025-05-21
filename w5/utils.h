@@ -1,5 +1,15 @@
 #pragma once
 
+#include <cstdint>
+
+
+static const uint32_t COLOR_R = 0xff000000;
+static const uint32_t COLOR_G = 0x00ff0000;
+static const uint32_t COLOR_B = 0x0000ff00;
+static const uint32_t COLOR_A = 0x000000ff;
+
+static const uint32_t COLOR_CLIENT_BG = COLOR_A + (COLOR_R + COLOR_G + COLOR_B) / 3;
+
 
 static const char* CLIENT_NAME = "w5 networked MIPT";
 static const int CLIENT_WIDTH = 600;

@@ -126,7 +126,7 @@ static void simulate_world(ENetPeer* serverPeer)
 static void draw_world(const Camera2D& camera)
 {
   BeginDrawing();
-    ClearBackground(GRAY);
+    ClearBackground(GetColor(COLOR_CLIENT_BG));
     BeginMode2D(camera);
 
       for (const auto& itf : snapshot_history)
