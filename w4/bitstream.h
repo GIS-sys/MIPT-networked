@@ -24,7 +24,7 @@ class BitStream {
     bool _is_view = false; // if generated from packet, then will not delete data itself
 
     void ensure_cap(size_t additional_size) {
-        if (!_is_view) return;
+        if (_is_view) return;
         if (_skip + _size + additional_size < _cap) return;
         size_t new_cap = _cap;
         while (_skip + _size + additional_size >= new_cap) {
@@ -38,7 +38,7 @@ class BitStream {
     }
 
     void shrink() {
-        if (!_is_view) return;
+        if (_is_view) return;
         if (_skip * 2 < _cap) return;
         size_t new_cap = 1;
         while (_cap - _skip >= new_cap) {
