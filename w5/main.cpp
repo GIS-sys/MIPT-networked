@@ -5,6 +5,7 @@
 #include <enet/enet.h>
 #include <math.h>
 #include <stdio.h>
+#include <iostream>
 
 #include <vector>
 #include "entity.h"
@@ -42,14 +43,20 @@ static void get_entity(uint16_t eid, Callable c)
 
 void on_snapshot(ENetPacket *packet)
 {
-  uint16_t eid = invalid_entity;
-  float x = 0.f; float y = 0.f; float ori = 0.f;
-  deserialize_snapshot(packet, eid, x, y, ori);
-  get_entity(eid, [&](Entity& e)
+  Entity e_got;
+  int current_sim_frame_id = 0;
+  float dt = 0;
+  deserialize_snapshot(packet, e_got, current_sim_frame_id, dt);
+  get_entity(e_got.eid, [&](Entity& e)
   {
-      e.x = x;
-      e.y = y;
-      e.ori = ori;
+      e.x = e_got.x;
+      e.y = e_got.y;
+      e.vx = e_got.vx;
+      e.vy = e_got.vy;
+      e.ori = e_got.ori;
+      e.omega = e_got.omega;
+      e.thr = e_got.thr;
+      e.steer = e_got.steer;
   });
 }
 

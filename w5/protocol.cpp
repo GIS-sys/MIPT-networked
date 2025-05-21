@@ -31,10 +31,10 @@ void send_entity_input(ENetPeer *peer, uint16_t eid, float thr, float steer)
     enet_peer_send(peer, 0, bs.to_enet_packet(ENET_PACKET_FLAG_UNSEQUENCED));
 }
 
-void send_snapshot(ENetPeer *peer, uint16_t eid, float x, float y, float ori)
+void send_snapshot(ENetPeer *peer, const Entity& e, int current_sim_frame_id, uint32_t curTime)
 {
     BitStream bs;
-    bs << E_SERVER_TO_CLIENT_SNAPSHOT << eid << x << y << ori;
+    bs << E_SERVER_TO_CLIENT_SNAPSHOT << e << current_sim_frame_id << curTime;
     enet_peer_send(peer, 0, bs.to_enet_packet(ENET_PACKET_FLAG_UNSEQUENCED));
 }
 
@@ -74,12 +74,12 @@ void deserialize_entity_input(ENetPacket *packet, uint16_t &eid, float &thr, flo
     bs >> eid >> thr >> steer;
 }
 
-void deserialize_snapshot(ENetPacket *packet, uint16_t &eid, float &x, float &y, float &ori)
+void deserialize_snapshot(ENetPacket *packet, const Entity& e, int current_sim_frame_id, uint32_t curTime)
 {
     BitStream bs;
     bs.from_enet_packet(packet);
     bs.read_n(sizeof(MessageType));
-    bs >> eid >> x >> y >> ori;
+    bs >> e >> current_sim_frame_id >> curTime;
 }
 
 void deserialize_time_msec(ENetPacket *packet, uint32_t &timeMsec)
