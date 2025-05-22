@@ -1,10 +1,23 @@
 # What was done
 
-TODO
+Added time to snapshots
 
-static bool DISABLE_SIMULATION_AND_INTERPOLATION = false;
-static const uint32_t CLIENT_INTERPOLATION_DELAY_MS = 200;
-static const int SERVER_DELAY_PING_SIMULATION_MS = 100;
+Store snapshots history on client
+
+Add "frame" ids, initialize start from 0 on server, fix dt
+
+Add local simulation and interpolation for reducing latency and lags
+
+## How to test
+
+If you want to see what will happend when both interpolation AND simulation are disabled, set:
+utils.h :: static bool DISABLE_SIMULATION_AND_INTERPOLATION = true;
+
+If you want to play with client interpolation delay (how much client lags behind for smooth image), change:
+utils.h :: static const uint32_t CLIENT_INTERPOLATION_DELAY_MS
+
+If you want to play with server's "ping" (how much it waits between sending snapshots to clients), change:
+utils.h :: static const int SERVER_DELAY_PING_SIMULATION_MS
 
 # How to install
 
