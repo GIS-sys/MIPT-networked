@@ -187,9 +187,9 @@ int main(int argc, const char **argv)
   while (!WindowShouldClose())
   {
     update_net(client, serverPeer);
+    simulate_world(serverPeer);
     for (auto& itf : snapshot_history)
         itf.second.set_time(enet_time_get());
-    simulate_world(serverPeer);
     draw_world(camera);
     printf("%d\n", enet_time_get());
   }

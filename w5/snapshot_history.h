@@ -6,9 +6,22 @@
 #include "utils.h"
 
 
+struct Snapshot {
+    Entity e;
+    int sim_id = 0;
+    uint32_t curTime = 0;
+};
+
 class SnapshotHistory {
 private:
-    std::deque<Entity> snapshots;
+    std::deque<Snapshot> snapshots;
+    Entity current;
+    float thr = 0.0;
+    float steer = 0.0;
+
+    void _sort();
+    void _clear_old(uint32_t current_time);
+    void _predict(uint32_t current_time);
 
 public:
     SnapshotHistory() {}
