@@ -1,3 +1,11 @@
+# What was done
+
+TODO
+
+static bool DISABLE_SIMULATION_AND_INTERPOLATION = false;
+static const uint32_t CLIENT_INTERPOLATION_DELAY_MS = 200;
+static const int SERVER_DELAY_PING_SIMULATION_MS = 100;
+
 # How to install
 
 1) clone the repository, cd into it

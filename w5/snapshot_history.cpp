@@ -49,11 +49,17 @@ void SnapshotHistory::_interpolate(uint32_t current_time) {
 void SnapshotHistory::_simulate(uint32_t current_time) {
     std::cout << "Snapshot is simulating (server has not sent new data yet)" << std::endl;
     current = snapshots.back().e;
+    current.thr = thr;
+    current.steer = steer;
     float dt = ((int)current_time - (int)snapshots.back().curTime) * 0.001;
     simulate_entity(current, dt);
 }
 
 void SnapshotHistory::_predict(uint32_t current_time) {
+    if (DISABLE_SIMULATION_AND_INTERPOLATION) {
+        current = snapshots.front().e;
+        return;
+    }
     if (snapshots.size() >= 2) _interpolate(current_time);
     else _simulate(current_time);
 }

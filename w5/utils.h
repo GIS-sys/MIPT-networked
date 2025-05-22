@@ -5,13 +5,10 @@
 
 // v
 // Block for testing smoothing algorithms
-// TODO
-// TODO add different server delays, changing like sinus idk
-// TODO add flags to disable smoothing or smth to show
-// TODO write into readme what is done and how to play with
 static bool DISABLE_SIMULATION_AND_INTERPOLATION = false;
 static const uint32_t CLIENT_INTERPOLATION_DELAY_MS = 200;
-static const int SERVER_DELAY_PING_SIMULATION_US = 100000;
+static const int SERVER_DELAY_PING_SIMULATION_MS = 100;
+//static const int SERVER_DELAY_PING_SIMULATION_MS = 400;
 // ^
 
 

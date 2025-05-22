@@ -158,7 +158,7 @@ int main(int argc, const char **argv)
 
     printf("%d\n", curTime);
 
-    usleep(SERVER_DELAY_PING_SIMULATION_US);
+    usleep(SERVER_DELAY_PING_SIMULATION_MS * 1000);
   }
 
   enet_host_destroy(server);
