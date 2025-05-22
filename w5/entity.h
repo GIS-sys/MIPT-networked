@@ -25,3 +25,5 @@ struct Entity
 
 void simulate_entity(Entity &e, float dt);
 
+Entity interpolate_entity(const Entity &e1, const Entity &e2, float dt1, float dt2);
+

@@ -74,7 +74,7 @@ void deserialize_entity_input(ENetPacket *packet, uint16_t &eid, float &thr, flo
     bs >> eid >> thr >> steer;
 }
 
-void deserialize_snapshot(ENetPacket *packet, const Entity& e, int current_sim_frame_id, uint32_t curTime)
+void deserialize_snapshot(ENetPacket *packet, const Entity& e, int &current_sim_frame_id, uint32_t &curTime)
 {
     BitStream bs;
     bs.from_enet_packet(packet);

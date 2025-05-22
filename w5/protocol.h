@@ -25,6 +25,6 @@ MessageType get_packet_type(ENetPacket *packet);
 void deserialize_new_entity(ENetPacket *packet, Entity &ent);
 void deserialize_set_controlled_entity(ENetPacket *packet, uint16_t &eid);
 void deserialize_entity_input(ENetPacket *packet, uint16_t &eid, float &thr, float &steer);
-void deserialize_snapshot(ENetPacket *packet, const Entity& e, int current_sim_frame_id, uint32_t curTime);
+void deserialize_snapshot(ENetPacket *packet, const Entity& e, int &current_sim_frame_id, uint32_t &curTime);
 void deserialize_time_msec(ENetPacket *packet, uint32_t &timeMsec);
 

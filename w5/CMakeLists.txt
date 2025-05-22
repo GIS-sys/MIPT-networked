@@ -12,6 +12,7 @@ set(W5_SOURCES
     main.cpp
     protocol.cpp
     snapshot_history.cpp
+    entity.cpp
     )
 
 set(W5_SERVER_SOURCES

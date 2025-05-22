@@ -28,3 +28,15 @@ void simulate_entity(Entity &e, float dt)
   e.y = tile_val(e.y, worldSize);
 }
 
+Entity interpolate_entity(const Entity &e1, const Entity &e2, float dt1, float dt2)
+{
+    Entity e;
+    e.x = (e1.x * dt1 + e2.x * dt2) / (dt1 + dt2);
+    e.y = (e1.y * dt1 + e2.y * dt2) / (dt1 + dt2);
+    e.vx = (e1.vx * dt1 + e2.vx * dt2) / (dt1 + dt2);
+    e.vy = (e1.vy * dt1 + e2.vy * dt2) / (dt1 + dt2);
+    e.ori = (e1.ori * dt1 + e2.ori * dt2) / (dt1 + dt2);
+    e.omega = (e1.omega * dt1 + e2.omega * dt2) / (dt1 + dt2);
+    return e;
+}
+

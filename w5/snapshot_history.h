@@ -22,6 +22,8 @@ private:
     void _sort();
     void _clear_old(uint32_t current_time);
     void _predict(uint32_t current_time);
+    void _interpolate(uint32_t current_time);
+    void _simulate(uint32_t current_time);
 
 public:
     SnapshotHistory() {}
