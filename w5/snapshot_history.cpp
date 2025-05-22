@@ -5,21 +5,12 @@
 #include "entity.h"
 #include "utils.h"
 
-// TODO
-//   ? CLIENT_INTERPOLATION_DELAY_US
-//   ? clear old
-//   ? track time
-//   ? track sim frame ids
-//   interpolate?
-//   simulate
-//   delta from history ???
 
 void SnapshotHistory::init(const Entity& e) {
     snapshots.push_back(Snapshot(e, 0, 0));
 }
 
 void SnapshotHistory::add(const Entity& e, int current_sim_frame_id, uint32_t curTime) {
-    // TODO
     snapshots.push_back(Snapshot(e, current_sim_frame_id, curTime));
 }
 
@@ -53,12 +44,6 @@ void SnapshotHistory::_interpolate(uint32_t current_time) {
     float dt1 = (current_time - snapshots[0].curTime) * 0.001;
     float dt2 = (snapshots[1].curTime - current_time) * 0.001;
     current = interpolate_entity(snapshots[0].e, snapshots[1].e, dt1, dt2);
-    std::cout << snapshots[0].curTime << " < " << current_time << " > " << snapshots[1].curTime << std::endl;
-    std::cout << dt1 << " - " << dt2 << std::endl;
-    std::cout << snapshots[0].e.x << " - " << snapshots[1].e.x << " = " << current.x << std::endl;
-    std::cout << snapshots[0].e.y << " - " << snapshots[1].e.y << " = " << current.y << std::endl;
-    std::cout << snapshots[0].e.ori << " - " << snapshots[1].e.ori << " = " << current.ori << std::endl;
-    // TODO
 }
 
 void SnapshotHistory::_simulate(uint32_t current_time) {
@@ -69,18 +54,14 @@ void SnapshotHistory::_simulate(uint32_t current_time) {
 }
 
 void SnapshotHistory::_predict(uint32_t current_time) {
-    // TODO add different server delays, changing like sinus idk
     if (snapshots.size() >= 2) _interpolate(current_time);
     else _simulate(current_time);
 }
 
 void SnapshotHistory::set_time(uint32_t time) {
     uint32_t current_time = time - CLIENT_INTERPOLATION_DELAY_MS;
-    // current_time += CLIENT_INTERPOLATION_DELAY_MS; // TODO delete
     _sort();
     _clear_old(current_time);
     _predict(current_time);
 }
 
-// TODO add flags to disable smoothing or smth to show
-// TODO write into readme what is done and how to play with
