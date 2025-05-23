@@ -2,7 +2,10 @@
 #include <algorithm> // min/max
 #include "raylib.h"
 #include <enet/enet.h>
+#include <stdio.h>
+#include <iostream>
 
+#include <string>
 #include <vector>
 #include "entity.h"
 #include "protocol.h"
@@ -10,6 +13,7 @@
 
 static std::vector<Entity> entities;
 static std::unordered_map<uint16_t, size_t> indexMap;
+static std::unordered_map<uint16_t, float> indexMapPoints;
 static uint16_t my_entity = invalid_entity;
 
 void on_new_entity_packet(ENetPacket *packet)
@@ -39,13 +43,23 @@ static void get_entity(uint16_t eid, Callable c)
 void on_snapshot(ENetPacket *packet)
 {
   uint16_t eid = invalid_entity;
-  float x = 0.f; float y = 0.f;
-  deserialize_snapshot(packet, eid, x, y);
+  float x = 0.f; float y = 0.f; float size = 0.f;
+  deserialize_snapshot(packet, eid, x, y, size);
   get_entity(eid, [&](Entity& e)
   {
     e.x = x;
     e.y = y;
+    e.size = size;
   });
+}
+
+void on_point(ENetPacket *packet)
+{
+  uint16_t eid = invalid_entity;
+  float point = 0.f;
+  deserialize_point(packet, eid, point);
+  indexMapPoints[eid] = point;
+  std::cout << "Got new points for eid=" << eid << ": " << point << std::endl;
 }
 
 int main(int argc, const char **argv)
@@ -74,8 +88,8 @@ int main(int argc, const char **argv)
     return 1;
   }
 
-  int width = 800;
-  int height = 600;
+  int width = 1200;
+  int height = 1000;
   InitWindow(width, height, "w4 networked MIPT");
 
   const int scrWidth = GetMonitorWidth(0);
@@ -123,6 +137,11 @@ int main(int argc, const char **argv)
         case E_SERVER_TO_CLIENT_SNAPSHOT:
           on_snapshot(event.packet);
           break;
+        case E_SERVER_TO_CLIENT_POINT:
+          on_point(event.packet);
+          break;
+        default:
+          break;
         };
         break;
       default:
@@ -142,7 +161,7 @@ int main(int argc, const char **argv)
         e.y += ((up ? -dt : 0.f) + (down ? +dt : 0.f)) * 100.f;
 
         // Send
-        send_entity_state(serverPeer, my_entity, e.x, e.y);
+        send_entity_state(serverPeer, my_entity, e.x, e.y, e.size);
         camera.target.x = e.x;
         camera.target.y = e.y;
       });
@@ -154,11 +173,38 @@ int main(int argc, const char **argv)
       BeginMode2D(camera);
         for (const Entity &e : entities)
         {
-          const Rectangle rect = {e.x, e.y, 10.f, 10.f};
+          const Rectangle rect = {e.x - e.size / 2, e.y - e.size / 2, e.size, e.size};
           DrawRectangleRec(rect, GetColor(e.color));
+          DrawText(std::to_string(e.eid).c_str(), e.x + e.size / 2, e.y - e.size, 4.0, GetColor(e.color));
+          DrawText(std::to_string(e.size).c_str(), e.x + e.size / 2, e.y + e.size / 2, 4.0, GetColor(e.color));
+          if (e.eid == my_entity) {
+            for (const Entity &e2 : entities)
+            {
+              if (e.eid == e2.eid) continue;
+              const float diffX = std::abs(e.x - e2.x);
+              const float diffY = std::abs(e.y - e2.y);
+              float almost_touch = std::max(diffX, diffY) * 2 / (e.size + e2.size);
+              if (almost_touch < 10) {
+                if (e.size > e2.size)
+                  DrawLine(e.x, e.y, e2.x, e2.y, GREEN);
+                else
+                  DrawLine(e.x, e.y, e2.x, e2.y, RED);
+              }
+            }
+          }
         }
 
       EndMode2D();
+      DrawText("Points:", 20, 20, TEXT_SIZE, WHITE);
+      int i = 2;
+      for (const auto& [eid, point] : indexMapPoints) {
+        if (eid == my_entity) {
+          DrawText(("Me (" + std::to_string(eid) + "): " + std::to_string(point)).c_str(), 20, 20 + TEXT_SIZE * 2 * 1, TEXT_SIZE, WHITE);
+          continue;
+        }
+        DrawText((std::to_string(eid) + ": " + std::to_string(point)).c_str(), 20, 20 + TEXT_SIZE * 2 * i, TEXT_SIZE, WHITE);
+        ++i;
+      }
     EndDrawing();
   }
 
