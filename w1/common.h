@@ -1,0 +1,69 @@
+#pragma once
+
+#include <algorithm>
+#include <arpa/inet.h>
+#include <cstring>
+#include <iostream>
+#include <netinet/in.h>
+#include <string>
+
+
+static const char* SERVER_ADDR = "localhost";
+static const int SERVER_PORT = 2025;
+static const int CLIENT_SLEEP_BETWEEN_RECEIVE = 0;
+static const int CLIENT_RECEIVE_TIMEOUT_US = 1'000'000;
+static const int SERVER_SLEEP_BETWEEN_RECEIVE = 0;
+static const int SERVER_RECEIVE_TIMEOUT_US = 100'000;
+static const int MESSAGE_BUFFER_SIZE = 1024;
+
+static const std::string SYSMSG_REGISTER = "/REG";
+static const std::string SYSMSG_UNREGISTER = "/UNREG";
+static const std::string SYSMSG_SEND_TO_OTHERS = "/c";
+static const std::string SYSMSG_MATHDUEL_INIT = "/mathduel";
+static const std::string SYSMSG_MATHDUEL_ANS = "/ans";
+
+
+struct ReadResult {
+    std::string msg;
+    sockaddr_in responder_sockaddr;
+    bool is_error = false;
+    bool is_empty = true;
+
+    static char* calc_responder_addr(const sockaddr_in& some_sockaddr) { return inet_ntoa(some_sockaddr.sin_addr); };
+    static int calc_responder_port(const sockaddr_in& some_sockaddr) { return ntohs(some_sockaddr.sin_port); };
+
+    char* get_responder_addr() const { return calc_responder_addr(responder_sockaddr); };
+    int get_responder_port() const { return calc_responder_port(responder_sockaddr); };
+
+    bool starts(const std::string& sysmsg) const { return msg.rfind(sysmsg, 0) == 0; }
+    std::string get_sys_msg(const std::string& sysmsg) const { return msg.substr(sysmsg.length()); }
+
+};
+
+
+class CommonCS {
+protected:
+    ssize_t _send(const std::string& msg, int sfd, sockaddr_in client_sockaddr) const;
+    ReadResult _read(int sfd) const;
+};
+
+
+// trim from start (in place)
+inline void ltrim(std::string &s) {
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) {
+        return !std::isspace(ch);
+    }));
+}
+
+// trim from end (in place)
+inline void rtrim(std::string &s) {
+    s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) {
+        return !std::isspace(ch);
+    }).base(), s.end());
+}
+
+// trim from both ends (in place)
+inline void trim(std::string &s) {
+    rtrim(s);
+    ltrim(s);
+}

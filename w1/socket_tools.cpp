@@ -9,6 +9,7 @@
 
 #include "socket_tools.h"
 
+
 // Adaptation of linux man page: https://linux.die.net/man/3/getaddrinfo
 static int get_dgram_socket(addrinfo *addr, bool should_bind, addrinfo *res_addr)
 {
