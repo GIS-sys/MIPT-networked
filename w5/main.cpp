@@ -2,27 +2,28 @@
 //
 #include <functional>
 #include "raylib.h"
+#include <map>
 #include <enet/enet.h>
 #include <math.h>
+#include <stdio.h>
+#include <iostream>
 
 #include <vector>
 #include "entity.h"
 #include "protocol.h"
+#include "utils.h"
+#include "snapshot_history.h"
 
 
-static std::vector<Entity> entities;
-static std::unordered_map<uint16_t, size_t> indexMap;
+static std::map<uint16_t, SnapshotHistory> snapshot_history;
 static uint16_t my_entity = invalid_entity;
 
 void on_new_entity_packet(ENetPacket *packet)
 {
   Entity newEntity;
   deserialize_new_entity(packet, newEntity);
-  auto itf = indexMap.find(newEntity.eid);
-  if (itf != indexMap.end())
-    return; // don't need to do anything, we already have entity
-  indexMap[newEntity.eid] = entities.size();
-  entities.push_back(newEntity);
+  snapshot_history[newEntity.eid] = SnapshotHistory();
+  snapshot_history[newEntity.eid].init(newEntity);
 }
 
 void on_set_controlled_entity(ENetPacket *packet)
@@ -31,24 +32,20 @@ void on_set_controlled_entity(ENetPacket *packet)
 }
 
 template<typename Callable>
-static void get_entity(uint16_t eid, Callable c)
+static void call_on_history(uint16_t eid, Callable c)
 {
-  auto itf = indexMap.find(eid);
-  if (itf != indexMap.end())
-    c(entities[itf->second]);
+  auto itf = snapshot_history.find(eid);
+  if (itf != snapshot_history.end())
+    c(itf->second);
 }
 
 void on_snapshot(ENetPacket *packet)
 {
-  uint16_t eid = invalid_entity;
-  float x = 0.f; float y = 0.f; float ori = 0.f;
-  deserialize_snapshot(packet, eid, x, y, ori);
-  get_entity(eid, [&](Entity& e)
-  {
-      e.x = x;
-      e.y = y;
-      e.ori = ori;
-  });
+  Entity e_got;
+  int current_sim_frame_id = 0;
+  uint32_t curTime = 0;
+  deserialize_snapshot(packet, e_got, current_sim_frame_id, curTime);
+  call_on_history(e_got.eid, [&](SnapshotHistory& h) { h.add(e_got, current_sim_frame_id, curTime); });
 }
 
 static void on_time(ENetPacket *packet, ENetPeer* peer)
@@ -113,11 +110,12 @@ static void simulate_world(ENetPeer* serverPeer)
     bool right = IsKeyDown(KEY_RIGHT);
     bool up = IsKeyDown(KEY_UP);
     bool down = IsKeyDown(KEY_DOWN);
-    get_entity(my_entity, [&](Entity& e)
+    call_on_history(my_entity, [&](SnapshotHistory& h)
     {
         // Update
         float thr = (up ? 1.f : 0.f) + (down ? -1.f : 0.f);
         float steer = (left ? -1.f : 0.f) + (right ? 1.f : 0.f);
+        h.update_controls(thr, steer);
 
         // Send
         send_entity_input(serverPeer, my_entity, thr, steer);
@@ -128,11 +126,11 @@ static void simulate_world(ENetPeer* serverPeer)
 static void draw_world(const Camera2D& camera)
 {
   BeginDrawing();
-    ClearBackground(GRAY);
+    ClearBackground(GetColor(COLOR_CLIENT_BG));
     BeginMode2D(camera);
 
-      for (const Entity &e : entities)
-        draw_entity(e);
+      for (const auto& itf : snapshot_history)
+        draw_entity(itf.second.get_current_entity());
 
     EndMode2D();
   EndDrawing();
@@ -154,8 +152,8 @@ int main(int argc, const char **argv)
   }
 
   ENetAddress address;
-  enet_address_set_host(&address, "localhost");
-  address.port = 10131;
+  enet_address_set_host(&address, SERVER_HOST);
+  address.port = SERVER_PORT;
 
   ENetPeer *serverPeer = enet_host_connect(client, &address, 2, 0);
   if (!serverPeer)
@@ -164,10 +162,10 @@ int main(int argc, const char **argv)
     return 1;
   }
 
-  int width = 600;
-  int height = 600;
+  int width = CLIENT_WIDTH;
+  int height = CLIENT_HEIGHT;
 
-  InitWindow(width, height, "w5 networked MIPT");
+  InitWindow(width, height, CLIENT_NAME);
 
   const int scrWidth = GetMonitorWidth(0);
   const int scrHeight = GetMonitorHeight(0);
@@ -184,14 +182,14 @@ int main(int argc, const char **argv)
   camera.rotation = 0.f;
   camera.zoom = 10.f;
 
-  SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
+  SetTargetFPS(CLIENT_FPS);
 
   while (!WindowShouldClose())
   {
-    float dt = GetFrameTime(); // for future use and making it look smooth
-
     update_net(client, serverPeer);
     simulate_world(serverPeer);
+    for (auto& itf : snapshot_history)
+        itf.second.set_time(enet_time_get());
     draw_world(camera);
     printf("%d\n", enet_time_get());
   }

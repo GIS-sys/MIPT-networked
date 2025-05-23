@@ -7,8 +7,12 @@
 #include <vector>
 #include <map>
 
+#include "utils.h"
+
 static std::vector<Entity> entities;
 static std::map<uint16_t, ENetPeer*> controlledMap;
+
+uint32_t curTime = 0;
 
 void on_join(ENetPacket *packet, ENetPeer *peer, ENetHost *host)
 {
@@ -21,13 +25,13 @@ void on_join(ENetPacket *packet, ENetPeer *peer, ENetHost *host)
   for (const Entity &e : entities)
     maxEid = std::max(maxEid, e.eid);
   uint16_t newEid = maxEid + 1;
-  uint32_t color = 0xff000000 +
-                   0x00440000 * (rand() % 5) +
-                   0x00004400 * (rand() % 5) +
-                   0x00000044 * (rand() % 5);
+  uint32_t color = COLOR_A +
+                   COLOR_R * (rand() % 4 + 1) +
+                   COLOR_G * (rand() % 4 + 1) +
+                   COLOR_B * (rand() % 4 + 1);
   float x = (rand() % 4) * 5.f;
   float y = (rand() % 4) * 5.f;
-  Entity ent = {color, x, y, 0.f, (rand() / RAND_MAX) * 3.141592654f, 0.f, 0.f, 0.f, 0.f, newEid};
+  Entity ent = { .color=color, .x=x, .y=y, .vx=0.f, .vy=0.f, .ori=(rand() * 1.0f / RAND_MAX) * 3.141592654f, .omega=0.f, .thr=0.f, .steer=0.f, .eid=newEid};
   entities.push_back(ent);
 
   controlledMap[newEid] = peer;
@@ -50,6 +54,7 @@ void on_input(ENetPacket *packet)
     {
       e.thr = thr;
       e.steer = steer;
+      break;
     }
 }
 
@@ -72,6 +77,8 @@ static void update_net(ENetHost* server)
         case E_CLIENT_TO_SERVER_INPUT:
           on_input(event.packet);
           break;
+        default:
+          break;
       };
       enet_packet_destroy(event.packet);
       break;
@@ -81,21 +88,28 @@ static void update_net(ENetHost* server)
   }
 }
 
-static void simulate_world(ENetHost* server, float dt)
+static std::pair<int, float> simulate_world(ENetHost* server, int current_sim_frame_id, float dt)
 {
-  for (Entity &e : entities)
-  {
-    // simulate
-    simulate_entity(e, dt); // 1.f/32.f
-    // send
-    for (size_t i = 0; i < server->peerCount; ++i)
-    {
-      ENetPeer *peer = &server->peers[i];
-      // skip this here in this implementation
-      //if (controlledMap[e.eid] != peer)
-      send_snapshot(peer, e.eid, e.x, e.y, e.ori);
+    while (dt >= SIMULATION_DT_S) {
+        ++current_sim_frame_id;
+        dt -= SIMULATION_DT_S;
+        for (Entity &e : entities)
+        {
+            // simulate
+            simulate_entity(e, SIMULATION_DT_S);
+        }
     }
-  }
+    // Only after we've simulated all the missing frames - send the current frame
+    for (Entity &e : entities)
+    {
+        // send
+        for (size_t i = 0; i < server->peerCount; ++i)
+        {
+            ENetPeer *peer = &server->peers[i];
+            send_snapshot(peer, e, current_sim_frame_id, curTime);
+        }
+    }
+    return { current_sim_frame_id, dt };
 }
 
 static void update_time(ENetHost* server, uint32_t curTime)
@@ -107,15 +121,15 @@ static void update_time(ENetHost* server, uint32_t curTime)
 
 int main(int argc, const char **argv)
 {
+  std::srand(0);
   if (enet_initialize() != 0)
   {
     printf("Cannot init ENet");
     return 1;
   }
   ENetAddress address;
-
   address.host = ENET_HOST_ANY;
-  address.port = 10131;
+  address.port = SERVER_PORT;
 
   ENetHost *server = enet_host_create(&address, 32, 2, 0, 0);
 
@@ -125,20 +139,26 @@ int main(int argc, const char **argv)
     return 1;
   }
 
-  uint32_t lastTime = enet_time_get();
+  uint32_t lastTime = 0;
+  float unused_dt = 0; // in case we dont even need to simulate game yet
+  int sim_frame_id = 0;
+  enet_time_set(0);
   while (true)
   {
-    uint32_t curTime = enet_time_get();
-    float dt = (curTime - lastTime) * 0.001f;
+    curTime = enet_time_get();
+    float dt = (curTime - lastTime) * 0.001f + unused_dt;
     lastTime = curTime;
 
     update_net(server);
-    simulate_world(server, dt);
+    auto [dsim_frame_id, ddt] = simulate_world(server, sim_frame_id, dt);
     update_time(server, curTime);
+
+    sim_frame_id = dsim_frame_id;
+    unused_dt = ddt;
 
     printf("%d\n", curTime);
 
-    usleep(100000);
+    usleep(SERVER_DELAY_PING_SIMULATION_MS * 1000);
   }
 
   enet_host_destroy(server);
